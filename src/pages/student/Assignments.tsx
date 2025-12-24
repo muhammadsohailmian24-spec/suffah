@@ -1,17 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { 
   GraduationCap, Bell, LogOut, BookOpen, FileText, Award, Calendar, 
-  Clock, Upload, CheckCircle, AlertCircle
+  Upload, CheckCircle, File
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,16 +24,30 @@ interface Assignment {
   status: string;
 }
 
+interface Submission {
+  id: string;
+  assignment_id: string;
+  submission_url: string | null;
+  marks_obtained: number | null;
+  is_late: boolean | null;
+  submitted_at: string;
+}
+
 const StudentAssignments = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [submissions, setSubmissions] = useState<Record<string, Submission>>({});
   const [loading, setLoading] = useState(true);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [submissionText, setSubmissionText] = useState("");
-  const [submissionUrl, setSubmissionUrl] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [studentId, setStudentId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -43,52 +57,126 @@ const StudentAssignments = () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { navigate("/auth"); return; }
 
-    const { data: roleData } = await supabase.from("user_roles" as any).select("role").eq("user_id", session.user.id).maybeSingle();
-    if (!roleData || (roleData as any).role !== "student") { navigate("/dashboard"); return; }
+    setUserId(session.user.id);
+
+    const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", session.user.id).maybeSingle();
+    if (!roleData || roleData.role !== "student") { navigate("/dashboard"); return; }
+
+    const { data: studentData } = await supabase.from("students").select("id").eq("user_id", session.user.id).maybeSingle();
+    if (studentData) {
+      setStudentId(studentData.id);
+      fetchSubmissions(studentData.id);
+    }
 
     fetchAssignments();
   };
 
   const fetchAssignments = async () => {
-    const { data, error } = await supabase.from("assignments" as any).select("*").eq("status", "active").order("due_date", { ascending: true });
-    if (!error && data) setAssignments(data as unknown as Assignment[]);
+    const { data, error } = await supabase.from("assignments").select("*").eq("status", "active").order("due_date", { ascending: true });
+    if (!error && data) setAssignments(data as Assignment[]);
     setLoading(false);
   };
 
+  const fetchSubmissions = async (sid: string) => {
+    const { data } = await supabase.from("submissions").select("*").eq("student_id", sid);
+    if (data) {
+      const map: Record<string, Submission> = {};
+      data.forEach(s => { map[s.assignment_id] = s as Submission; });
+      setSubmissions(map);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 50 * 1024 * 1024) {
+        toast({ title: "Error", description: "File size must be less than 50MB", variant: "destructive" });
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!selectedAssignment) return;
-    setSubmitting(true);
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const { data: studentData } = await supabase.from("students" as any).select("id").eq("user_id", session.user.id).maybeSingle();
-    
-    if (!studentData) {
-      toast({ title: "Error", description: "Student profile not found", variant: "destructive" });
-      setSubmitting(false);
+    if (!selectedAssignment || !studentId || !userId) return;
+    if (!submissionText && !selectedFile) {
+      toast({ title: "Error", description: "Please add text or upload a file", variant: "destructive" });
       return;
     }
 
-    const isLate = new Date() > new Date(selectedAssignment.due_date);
+    setSubmitting(true);
+    setUploadProgress(10);
 
-    const { error } = await supabase.from("submissions" as any).insert({
-      assignment_id: selectedAssignment.id,
-      student_id: (studentData as any).id,
-      submission_text: submissionText || null,
-      submission_url: submissionUrl || null,
-      is_late: isLate,
-    } as any);
+    try {
+      let fileUrl = null;
 
-    if (error) {
-      toast({ title: "Error", description: error.message.includes("duplicate") ? "Already submitted" : "Failed to submit", variant: "destructive" });
-    } else {
+      // Upload file if selected
+      if (selectedFile) {
+        setUploadProgress(30);
+        const fileName = `${userId}/${selectedAssignment.id}/${Date.now()}_${selectedFile.name}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('submissions')
+          .upload(fileName, selectedFile, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+
+        if (uploadError) throw uploadError;
+        
+        setUploadProgress(60);
+
+        // Get signed URL for private bucket
+        const { data: urlData } = await supabase.storage
+          .from('submissions')
+          .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
+
+        fileUrl = urlData?.signedUrl || fileName;
+      }
+
+      setUploadProgress(80);
+
+      const isLate = new Date() > new Date(selectedAssignment.due_date);
+      
+      // Check if already submitted
+      const existingSubmission = submissions[selectedAssignment.id];
+      
+      if (existingSubmission) {
+        // Update existing submission
+        const { error } = await supabase.from("submissions").update({
+          submission_text: submissionText || null,
+          submission_url: fileUrl,
+          is_late: isLate,
+          submitted_at: new Date().toISOString(),
+        }).eq("id", existingSubmission.id);
+
+        if (error) throw error;
+      } else {
+        // Create new submission
+        const { error } = await supabase.from("submissions").insert({
+          assignment_id: selectedAssignment.id,
+          student_id: studentId,
+          submission_text: submissionText || null,
+          submission_url: fileUrl,
+          is_late: isLate,
+        });
+
+        if (error) throw error;
+      }
+
+      setUploadProgress(100);
       toast({ title: "Submitted!", description: isLate ? "Assignment submitted (late)" : "Assignment submitted successfully" });
       setIsDialogOpen(false);
       setSubmissionText("");
-      setSubmissionUrl("");
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      fetchSubmissions(studentId);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to submit", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+      setUploadProgress(0);
     }
-    setSubmitting(false);
   };
 
   const handleSignOut = async () => { await supabase.auth.signOut(); navigate("/"); };
@@ -99,8 +187,8 @@ const StudentAssignments = () => {
     const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     
     if (diffDays < 0) return { label: "Past Due", color: "bg-destructive/10 text-destructive" };
-    if (diffDays <= 2) return { label: `${diffDays}d left`, color: "bg-warning/10 text-warning" };
-    return { label: `${diffDays}d left`, color: "bg-success/10 text-success" };
+    if (diffDays <= 2) return { label: `${diffDays}d left`, color: "bg-yellow-500/10 text-yellow-600" };
+    return { label: `${diffDays}d left`, color: "bg-green-500/10 text-green-600" };
   };
 
   return (
@@ -160,6 +248,9 @@ const StudentAssignments = () => {
                   <TableBody>
                     {assignments.map((assignment) => {
                       const deadline = getDeadlineStatus(assignment.due_date);
+                      const submission = submissions[assignment.id];
+                      const isSubmitted = !!submission;
+                      
                       return (
                         <TableRow key={assignment.id}>
                           <TableCell>
@@ -176,32 +267,78 @@ const StudentAssignments = () => {
                           </TableCell>
                           <TableCell>{assignment.max_marks}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={deadline.color}>{deadline.label}</Badge>
+                            {isSubmitted ? (
+                              <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-200">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                {submission.marks_obtained !== null ? `${submission.marks_obtained}/${assignment.max_marks}` : "Submitted"}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className={deadline.color}>{deadline.label}</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <Dialog open={isDialogOpen && selectedAssignment?.id === assignment.id} onOpenChange={(open) => {
                               setIsDialogOpen(open);
-                              if (open) setSelectedAssignment(assignment);
+                              if (open) {
+                                setSelectedAssignment(assignment);
+                                setSubmissionText("");
+                                setSelectedFile(null);
+                              }
                             }}>
                               <DialogTrigger asChild>
-                                <Button size="sm" className="hero-gradient text-primary-foreground gap-2">
-                                  <Upload className="w-4 h-4" />Submit
+                                <Button size="sm" variant={isSubmitted ? "outline" : "default"} className={!isSubmitted ? "hero-gradient text-primary-foreground" : ""}>
+                                  <Upload className="w-4 h-4 mr-1" />
+                                  {isSubmitted ? "Resubmit" : "Submit"}
                                 </Button>
                               </DialogTrigger>
-                              <DialogContent>
+                              <DialogContent className="max-w-lg">
                                 <DialogHeader>
                                   <DialogTitle>Submit Assignment</DialogTitle>
                                   <DialogDescription>{assignment.title}</DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4">
                                   <div className="space-y-2">
-                                    <Label>Your Answer / Notes</Label>
-                                    <Textarea placeholder="Write your answer here..." value={submissionText} onChange={(e) => setSubmissionText(e.target.value)} rows={5} />
+                                    <Label>Upload File</Label>
+                                    <div 
+                                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                                        selectedFile ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                                      }`}
+                                      onClick={() => fileInputRef.current?.click()}
+                                    >
+                                      <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        onChange={handleFileSelect}
+                                        className="hidden"
+                                        accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.txt,.zip"
+                                      />
+                                      {selectedFile ? (
+                                        <div className="flex items-center justify-center gap-2">
+                                          <File className="w-8 h-8 text-primary" />
+                                          <div className="text-left">
+                                            <p className="font-medium">{selectedFile.name}</p>
+                                            <p className="text-xs text-muted-foreground">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                                          <p className="text-sm text-muted-foreground">Click to select a file</p>
+                                          <p className="text-xs text-muted-foreground mt-1">PDF, Word, Images, ZIP (max 50MB)</p>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
                                   <div className="space-y-2">
-                                    <Label>File URL (optional)</Label>
-                                    <Input placeholder="https://drive.google.com/..." value={submissionUrl} onChange={(e) => setSubmissionUrl(e.target.value)} />
+                                    <Label>Additional Notes (optional)</Label>
+                                    <Textarea placeholder="Any additional comments..." value={submissionText} onChange={(e) => setSubmissionText(e.target.value)} rows={4} />
                                   </div>
+                                  {submitting && (
+                                    <div className="space-y-2">
+                                      <Progress value={uploadProgress} className="h-2" />
+                                      <p className="text-xs text-center text-muted-foreground">Uploading... {uploadProgress}%</p>
+                                    </div>
+                                  )}
                                 </div>
                                 <DialogFooter>
                                   <Button onClick={handleSubmit} disabled={submitting} className="hero-gradient text-primary-foreground">
