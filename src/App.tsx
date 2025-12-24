@@ -11,10 +11,16 @@ import AdminUsers from "./pages/admin/Users";
 import AdminClasses from "./pages/admin/Classes";
 import AdminSubjects from "./pages/admin/Subjects";
 import AdminAnalytics from "./pages/admin/Analytics";
+import AdminExams from "./pages/admin/Exams";
+import AdminTimetable from "./pages/admin/Timetable";
+import AdminDepartments from "./pages/admin/Departments";
 import TeacherAttendance from "./pages/teacher/Attendance";
 import TeacherAssignments from "./pages/teacher/Assignments";
 import TeacherMaterials from "./pages/teacher/Materials";
 import TeacherResults from "./pages/teacher/Results";
+import TeacherExams from "./pages/teacher/Exams";
+import TeacherTimetable from "./pages/teacher/Timetable";
+import TeacherAnnouncements from "./pages/teacher/Announcements";
 import StudentCourses from "./pages/student/Courses";
 import StudentAssignments from "./pages/student/Assignments";
 import StudentResults from "./pages/student/Results";
@@ -43,12 +49,18 @@ const App = () => (
           <Route path="/admin/classes" element={<AdminClasses />} />
           <Route path="/admin/subjects" element={<AdminSubjects />} />
           <Route path="/admin/analytics" element={<AdminAnalytics />} />
+          <Route path="/admin/exams" element={<AdminExams />} />
+          <Route path="/admin/timetable" element={<AdminTimetable />} />
+          <Route path="/admin/departments" element={<AdminDepartments />} />
           <Route path="/admin/admissions" element={<AdminUsers />} />
           {/* Teacher Routes */}
           <Route path="/teacher/attendance" element={<TeacherAttendance />} />
           <Route path="/teacher/assignments" element={<TeacherAssignments />} />
           <Route path="/teacher/materials" element={<TeacherMaterials />} />
           <Route path="/teacher/results" element={<TeacherResults />} />
+          <Route path="/teacher/exams" element={<TeacherExams />} />
+          <Route path="/teacher/timetable" element={<TeacherTimetable />} />
+          <Route path="/teacher/announcements" element={<TeacherAnnouncements />} />
           {/* Student Routes */}
           <Route path="/student/courses" element={<StudentCourses />} />
           <Route path="/student/assignments" element={<StudentAssignments />} />
