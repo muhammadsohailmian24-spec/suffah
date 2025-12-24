@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Admissions from "./pages/Admissions";
 import AdminUsers from "./pages/admin/Users";
+import AdminUserManagement from "./pages/admin/UserManagement";
 import AdminClasses from "./pages/admin/Classes";
 import AdminSubjects from "./pages/admin/Subjects";
 import AdminAnalytics from "./pages/admin/Analytics";
@@ -47,6 +48,7 @@ const App = () => (
           <Route path="/admissions" element={<Admissions />} />
           {/* Admin Routes */}
           <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/user-management" element={<AdminUserManagement />} />
           <Route path="/admin/classes" element={<AdminClasses />} />
           <Route path="/admin/subjects" element={<AdminSubjects />} />
           <Route path="/admin/analytics" element={<AdminAnalytics />} />
