@@ -152,7 +152,7 @@ async function generateReceiptPdf(data: InvoiceData): Promise<Uint8Array> {
   const rowY = tableTop - 30;
   page.drawText(data.feeName, { x: 50, y: rowY, size: 10, font: helvetica, color: darkColor });
   page.drawText(data.feeType.charAt(0).toUpperCase() + data.feeType.slice(1), { x: 250, y: rowY, size: 10, font: helvetica, color: darkColor });
-  page.drawText(`₦${data.amount.toLocaleString()}`, { x: 400, y: rowY, size: 10, font: helvetica, color: darkColor });
+  page.drawText(`NGN ${data.amount.toLocaleString()}`, { x: 400, y: rowY, size: 10, font: helvetica, color: darkColor });
 
   // Totals section
   const totalsX = width - 220;
@@ -167,15 +167,15 @@ async function generateReceiptPdf(data: InvoiceData): Promise<Uint8Array> {
   });
 
   page.drawText("Subtotal:", { x: totalsX + 10, y: totalsY, size: 10, font: helvetica, color: grayColor });
-  page.drawText(`₦${data.amount.toLocaleString()}`, { x: totalsX + 120, y: totalsY, size: 10, font: helvetica, color: darkColor });
+  page.drawText(`NGN ${data.amount.toLocaleString()}`, { x: totalsX + 120, y: totalsY, size: 10, font: helvetica, color: darkColor });
 
   totalsY -= 18;
   page.drawText("Discount:", { x: totalsX + 10, y: totalsY, size: 10, font: helvetica, color: grayColor });
-  page.drawText(`-₦${data.discount.toLocaleString()}`, { x: totalsX + 120, y: totalsY, size: 10, font: helvetica, color: greenColor });
+  page.drawText(`-NGN ${data.discount.toLocaleString()}`, { x: totalsX + 120, y: totalsY, size: 10, font: helvetica, color: greenColor });
 
   totalsY -= 18;
   page.drawText("Total Due:", { x: totalsX + 10, y: totalsY, size: 10, font: helvetica, color: grayColor });
-  page.drawText(`₦${data.finalAmount.toLocaleString()}`, { x: totalsX + 120, y: totalsY, size: 10, font: helveticaBold, color: darkColor });
+  page.drawText(`NGN ${data.finalAmount.toLocaleString()}`, { x: totalsX + 120, y: totalsY, size: 10, font: helveticaBold, color: darkColor });
 
   // Line separator
   totalsY -= 15;
@@ -188,7 +188,7 @@ async function generateReceiptPdf(data: InvoiceData): Promise<Uint8Array> {
 
   totalsY -= 18;
   page.drawText("Amount Paid:", { x: totalsX + 10, y: totalsY, size: 12, font: helveticaBold, color: primaryColor });
-  page.drawText(`₦${data.paidAmount.toLocaleString()}`, { x: totalsX + 110, y: totalsY, size: 12, font: helveticaBold, color: greenColor });
+  page.drawText(`NGN ${data.paidAmount.toLocaleString()}`, { x: totalsX + 110, y: totalsY, size: 12, font: helveticaBold, color: greenColor });
 
   // Payment method
   page.drawText("PAYMENT DETAILS", { x: 40, y: tableTop - 100, size: 12, font: helveticaBold, color: primaryColor });
@@ -202,7 +202,7 @@ async function generateReceiptPdf(data: InvoiceData): Promise<Uint8Array> {
   // Balance
   const balance = data.finalAmount - data.paidAmount;
   if (balance > 0) {
-    page.drawText(`Remaining Balance: ₦${balance.toLocaleString()}`, { 
+    page.drawText(`Remaining Balance: NGN ${balance.toLocaleString()}`, { 
       x: 40, y: tableTop - 156, size: 10, font: helveticaBold, color: rgb(0.86, 0.2, 0.2) 
     });
   } else {
@@ -353,7 +353,7 @@ async function getTotalPaidForFee(supabase: any, studentFeeId: string): Promise<
 }
 
 function formatCurrency(amount: number): string {
-  return `₦${amount.toLocaleString()}`;
+  return `NGN ${amount.toLocaleString()}`;
 }
 
 const handler = async (req: Request): Promise<Response> => {

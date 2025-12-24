@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Receipt, CreditCard, FileText, Loader2, Search, Download, Printer } from "lucide-react";
+import { Plus, Receipt, CreditCard, FileText, Loader2, Search, Download, Printer, Mail } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { downloadInvoice, printInvoice } from "@/utils/generateInvoicePdf";
 import { downloadReceipt, printReceipt } from "@/utils/generateReceiptPdf";
 
@@ -85,7 +86,8 @@ const FeeManagement = () => {
     amount: "",
     payment_method: "cash",
     transaction_id: "",
-    remarks: ""
+    remarks: "",
+    sendEmailReceipt: true
   });
 
   useEffect(() => {
@@ -295,28 +297,32 @@ const FeeManagement = () => {
         .eq("id", selectedStudentFee.id);
     }
 
-    // Send payment confirmation notification with PDF receipt
-    try {
-      await supabase.functions.invoke("send-fee-notification", {
-        body: {
-          type: "payment_received",
-          studentId: selectedStudentFee.student_id,
-          paymentDetails: {
-            amount: parseFloat(paymentForm.amount),
-            receiptNumber: receiptNumber,
-            paymentMethod: paymentForm.payment_method,
-            studentFeeId: selectedStudentFee.id,
+    // Send payment confirmation notification with PDF receipt if enabled
+    if (paymentForm.sendEmailReceipt) {
+      try {
+        await supabase.functions.invoke("send-fee-notification", {
+          body: {
+            type: "payment_received",
+            studentId: selectedStudentFee.student_id,
+            paymentDetails: {
+              amount: parseFloat(paymentForm.amount),
+              receiptNumber: receiptNumber,
+              paymentMethod: paymentForm.payment_method,
+              studentFeeId: selectedStudentFee.id,
+            },
           },
-        },
-      });
-      toast.success(`Payment recorded and receipt sent. Receipt: ${receiptNumber}`);
-    } catch (notifError) {
-      console.error("Notification error:", notifError);
+        });
+        toast.success(`Payment recorded and receipt emailed. Receipt: ${receiptNumber}`);
+      } catch (notifError) {
+        console.error("Notification error:", notifError);
+        toast.success(`Payment recorded. Receipt: ${receiptNumber}`);
+      }
+    } else {
       toast.success(`Payment recorded. Receipt: ${receiptNumber}`);
     }
     
     setPaymentDialog(false);
-    setPaymentForm({ amount: "", payment_method: "cash", transaction_id: "", remarks: "" });
+    setPaymentForm({ amount: "", payment_method: "cash", transaction_id: "", remarks: "", sendEmailReceipt: true });
     setSelectedStudentFee(null);
     fetchStudentFees();
     fetchPayments();
@@ -882,6 +888,19 @@ const FeeManagement = () => {
               <Input 
                 value={paymentForm.transaction_id} 
                 onChange={(e) => setPaymentForm({ ...paymentForm, transaction_id: e.target.value })}
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <Label htmlFor="send-email-receipt" className="cursor-pointer">
+                  Send receipt via email
+                </Label>
+              </div>
+              <Switch 
+                id="send-email-receipt"
+                checked={paymentForm.sendEmailReceipt}
+                onCheckedChange={(checked) => setPaymentForm({ ...paymentForm, sendEmailReceipt: checked })}
               />
             </div>
             <Button onClick={handleRecordPayment} className="w-full">
