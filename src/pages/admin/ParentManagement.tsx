@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Pencil, Trash2, Link2, Unlink, Loader2, KeyRound } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, Link2, Unlink, Loader2, KeyRound, Mail } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import AdminLayout from "@/components/admin/AdminLayout";
 
@@ -53,6 +54,7 @@ const ParentManagement = () => {
   const [resetPasswordUser, setResetPasswordUser] = useState<{ userId: string; name: string } | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [sendEmailNotification, setSendEmailNotification] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -380,6 +382,7 @@ const ParentManagement = () => {
   const openResetPasswordDialog = (parent: Parent) => {
     setResetPasswordUser({ userId: parent.user_id, name: parent.profile?.full_name || "User" });
     setNewPassword("");
+    setSendEmailNotification(true);
     setIsResetPasswordDialogOpen(true);
   };
 
@@ -392,6 +395,7 @@ const ParentManagement = () => {
         body: {
           userId: resetPasswordUser.userId,
           newPassword: newPassword,
+          sendEmail: sendEmailNotification,
         },
       });
 
@@ -732,6 +736,19 @@ const ParentManagement = () => {
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Min. 6 characters"
                 minLength={6}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                <Label htmlFor="send-email-parent" className="text-sm font-normal cursor-pointer">
+                  Send email with new credentials
+                </Label>
+              </div>
+              <Switch
+                id="send-email-parent"
+                checked={sendEmailNotification}
+                onCheckedChange={setSendEmailNotification}
               />
             </div>
             <DialogFooter>
