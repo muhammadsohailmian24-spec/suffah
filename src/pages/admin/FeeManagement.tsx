@@ -283,7 +283,7 @@ const FeeManagement = () => {
         .eq("id", selectedStudentFee.id);
     }
 
-    // Send payment confirmation notification
+    // Send payment confirmation notification with PDF receipt
     try {
       await supabase.functions.invoke("send-fee-notification", {
         body: {
@@ -293,6 +293,7 @@ const FeeManagement = () => {
             amount: parseFloat(paymentForm.amount),
             receiptNumber: receiptNumber,
             paymentMethod: paymentForm.payment_method,
+            studentFeeId: selectedStudentFee.id,
           },
         },
       });
