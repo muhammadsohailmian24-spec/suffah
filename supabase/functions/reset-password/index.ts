@@ -12,6 +12,7 @@ const corsHeaders = {
 interface ResetPasswordRequest {
   userId: string;
   newPassword: string;
+  sendEmail?: boolean;
 }
 
 serve(async (req) => {
@@ -63,7 +64,7 @@ serve(async (req) => {
     }
 
     const body: ResetPasswordRequest = await req.json();
-    const { userId, newPassword } = body;
+    const { userId, newPassword, sendEmail = true } = body;
 
     if (!userId || !newPassword) {
       return new Response(JSON.stringify({ error: "Missing required fields: userId and newPassword" }), {
@@ -116,9 +117,9 @@ serve(async (req) => {
 
     console.log("Password reset successfully for user:", userId);
 
-    // Send email notification with new credentials
+    // Send email notification with new credentials (if enabled)
     let emailSent = false;
-    if (userEmail) {
+    if (sendEmail && userEmail) {
       try {
         const emailResponse = await resend.emails.send({
           from: "School Management <onboarding@resend.dev>",
