@@ -114,10 +114,10 @@ const Dashboard = () => {
         ];
       case "parent":
         return [
-          { icon: TrendingUp, label: "Progress", desc: "Academic progress", color: "bg-primary/10 text-primary", link: "/parent/progress" },
-          { icon: ClipboardList, label: "Attendance", desc: "View attendance", color: "bg-info/10 text-info", link: "/parent/attendance" },
-          { icon: Award, label: "Results", desc: "Check grades", color: "bg-warning/10 text-warning", link: "/parent/results" },
-          { icon: MessageSquare, label: "Messages", desc: "Contact teachers", color: "bg-success/10 text-success", link: "/parent/messages" },
+          { icon: Users, label: "Children", desc: "View children", color: "bg-primary/10 text-primary", link: "/parent/children" },
+          { icon: Bell, label: "Announcements", desc: "Latest news", color: "bg-info/10 text-info", link: "/parent/announcements" },
+          { icon: Award, label: "Results", desc: "Check grades", color: "bg-warning/10 text-warning", link: "/parent/children" },
+          { icon: Settings, label: "Notifications", desc: "Preferences", color: "bg-success/10 text-success", link: "/parent/notifications" },
         ];
       default:
         return [];
