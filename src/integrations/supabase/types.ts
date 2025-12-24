@@ -487,6 +487,7 @@ export type Database = {
           gender: string | null
           id: string
           phone: string | null
+          sms_notifications_enabled: boolean | null
           updated_at: string
           user_id: string
         }
@@ -500,6 +501,7 @@ export type Database = {
           gender?: string | null
           id?: string
           phone?: string | null
+          sms_notifications_enabled?: boolean | null
           updated_at?: string
           user_id: string
         }
@@ -513,6 +515,7 @@ export type Database = {
           gender?: string | null
           id?: string
           phone?: string | null
+          sms_notifications_enabled?: boolean | null
           updated_at?: string
           user_id?: string
         }
