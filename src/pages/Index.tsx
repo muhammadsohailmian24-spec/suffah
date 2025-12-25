@@ -32,13 +32,21 @@ const Index = () => {
             </div>
           </div>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="nav-link">Features</a>
-            <a href="#about" className="nav-link">About</a>
-            <Link to="/admissions" className="nav-link">Admissions</Link>
+            <a href="#features" className="nav-link">
+              Features
+            </a>
+            <a href="#about" className="nav-link">
+              About
+            </a>
+            <Link to="/admissions" className="nav-link">
+              Admissions
+            </Link>
           </div>
           <div className="flex items-center gap-3">
             <Link to="/auth">
-              <Button variant="ghost" size="sm">Sign In</Button>
+              <Button variant="ghost" size="sm">
+                Sign In
+              </Button>
             </Link>
             <Link to="/auth?mode=signup">
               <Button size="sm" className="hero-gradient text-primary-foreground hover:opacity-90">
@@ -54,24 +62,23 @@ const Index = () => {
         <div className="absolute inset-0 pattern-dots opacity-50" />
         <div className="absolute top-20 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-gold-400/10 rounded-full blur-3xl" />
-        
+
         <div className="container mx-auto px-6 relative">
           <div className="max-w-3xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent text-accent-foreground text-sm font-medium mb-6 animate-fade-in">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              Now accepting admissions for 2025
+              Now accepting admissions for 2026-27
             </div>
-            
+
             <h1 className="font-heading text-4xl md:text-6xl font-bold text-foreground mb-6 animate-slide-up">
-              Empowering Minds,{" "}
-              <span className="text-gradient">Shaping Futures</span>
+              Empowering Minds, <span className="text-gradient">Shaping Futures</span>
             </h1>
-            
+
             <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto animate-slide-up stagger-1">
-              The Suffah Public School & College Management System - A comprehensive platform 
-              for students, teachers, parents, and administrators.
+              The Suffah Public School & College Management System - A comprehensive platform for students, teachers,
+              parents, and administrators.
             </p>
-            
+
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up stagger-2">
               <Link to="/auth?mode=signup">
                 <Button size="lg" className="hero-gradient text-primary-foreground gap-2 px-8 btn-glow">
@@ -94,9 +101,7 @@ const Index = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {stats.map((stat, i) => (
               <div key={i} className="text-center animate-scale-in" style={{ animationDelay: `${i * 0.1}s` }}>
-                <div className="font-heading text-4xl md:text-5xl font-bold text-gradient-gold mb-2">
-                  {stat.value}
-                </div>
+                <div className="font-heading text-4xl md:text-5xl font-bold text-gradient-gold mb-2">{stat.value}</div>
                 <div className="text-muted-foreground">{stat.label}</div>
               </div>
             ))}
@@ -108,18 +113,16 @@ const Index = () => {
       <section id="features" className="py-20">
         <div className="container mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="font-heading text-3xl md:text-4xl font-bold mb-4">
-              Everything You Need
-            </h2>
+            <h2 className="font-heading text-3xl md:text-4xl font-bold mb-4">Everything You Need</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               A complete school management solution designed for modern educational institutions
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, i) => (
-              <div 
-                key={i} 
+              <div
+                key={i}
                 className="stat-card group cursor-pointer animate-slide-up"
                 style={{ animationDelay: `${i * 0.1}s` }}
               >
@@ -139,21 +142,20 @@ const Index = () => {
         <div className="container mx-auto px-6">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="font-heading text-3xl md:text-4xl font-bold mb-6">
-                About The Suffah
-              </h2>
+              <h2 className="font-heading text-3xl md:text-4xl font-bold mb-6">About The Suffah</h2>
               <p className="text-primary-foreground/80 mb-6">
-                Named after the historic Suffah - the learning platform at the Prophet's Mosque - 
-                we are committed to providing quality education that nurtures both academic excellence 
-                and moral character.
+                Named after the historic Suffah - the learning platform at the Prophet's Mosque - we are committed to
+                providing quality education that nurtures both academic excellence and moral character.
               </p>
               <ul className="space-y-3">
-                {["Quality Education", "Experienced Faculty", "Modern Facilities", "Holistic Development"].map((item, i) => (
-                  <li key={i} className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-gold-400" />
-                    <span>{item}</span>
-                  </li>
-                ))}
+                {["Quality Education", "Experienced Faculty", "Modern Facilities", "Holistic Development"].map(
+                  (item, i) => (
+                    <li key={i} className="flex items-center gap-3">
+                      <CheckCircle className="w-5 h-5 text-gold-400" />
+                      <span>{item}</span>
+                    </li>
+                  ),
+                )}
               </ul>
             </div>
             <div className="relative">
@@ -178,9 +180,7 @@ const Index = () => {
                 <p className="text-sm text-muted">Excellence in Education</p>
               </div>
             </div>
-            <p className="text-sm text-muted">
-              © {new Date().getFullYear()} The Suffah. All rights reserved.
-            </p>
+            <p className="text-sm text-muted">© {new Date().getFullYear()} The Suffah. All rights reserved.</p>
           </div>
         </div>
       </footer>
