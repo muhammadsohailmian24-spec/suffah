@@ -5,9 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import AdminLayout from "@/components/admin/AdminLayout";
+import AbsentStudentsList from "@/components/AbsentStudentsList";
 import {
   Users, GraduationCap, UserCheck, School, Clock, CheckCircle, 
-  XCircle, TrendingUp, Bell, Calendar, FileText, AlertTriangle
+  XCircle, TrendingUp, Bell, Calendar, FileText, AlertTriangle, UserX
 } from "lucide-react";
 
 interface Stats {
@@ -16,7 +17,9 @@ interface Stats {
   totalParents: number;
   totalClasses: number;
   pendingAdmissions: number;
-  todayAttendance: number;
+  todayPresent: number;
+  todayAbsent: number;
+  todayLate: number;
 }
 
 interface Activity {
@@ -35,7 +38,9 @@ const AdminDashboard = () => {
     totalParents: 0,
     totalClasses: 0,
     pendingAdmissions: 0,
-    todayAttendance: 0,
+    todayPresent: 0,
+    todayAbsent: 0,
+    todayLate: 0,
   });
 
   useEffect(() => {
@@ -62,30 +67,29 @@ const AdminDashboard = () => {
   };
 
   const fetchStats = async () => {
+    const today = new Date().toISOString().split('T')[0];
+
     // Fetch all counts in parallel
-    const [studentsRes, teachersRes, parentsRes, classesRes, admissionsRes] = await Promise.all([
+    const [studentsRes, teachersRes, parentsRes, classesRes, admissionsRes, attendanceRes] = await Promise.all([
       supabase.from("students").select("id", { count: "exact", head: true }),
       supabase.from("teachers").select("id", { count: "exact", head: true }),
       supabase.from("parents").select("id", { count: "exact", head: true }),
       supabase.from("classes").select("id", { count: "exact", head: true }),
       supabase.from("admissions").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("attendance").select("status").eq("date", today),
     ]);
 
-    // Get today's attendance
-    const today = new Date().toISOString().split('T')[0];
-    const { count: attendanceCount } = await supabase
-      .from("attendance")
-      .select("id", { count: "exact", head: true })
-      .eq("date", today)
-      .eq("status", "present");
-
+    const attendanceData = attendanceRes.data || [];
+    
     setStats({
       totalStudents: studentsRes.count || 0,
       totalTeachers: teachersRes.count || 0,
       totalParents: parentsRes.count || 0,
       totalClasses: classesRes.count || 0,
       pendingAdmissions: admissionsRes.count || 0,
-      todayAttendance: attendanceCount || 0,
+      todayPresent: attendanceData.filter(a => a.status === "present").length,
+      todayAbsent: attendanceData.filter(a => a.status === "absent").length,
+      todayLate: attendanceData.filter(a => a.status === "late").length,
     });
   };
 
@@ -95,7 +99,7 @@ const AdminDashboard = () => {
     { icon: Users, label: "Total Parents", value: stats.totalParents, color: "text-warning", bgColor: "bg-warning/10", trend: "Registered" },
     { icon: School, label: "Total Classes", value: stats.totalClasses, color: "text-success", bgColor: "bg-success/10", trend: "All grades" },
     { icon: Clock, label: "Pending Admissions", value: stats.pendingAdmissions, color: "text-destructive", bgColor: "bg-destructive/10", trend: "Needs review" },
-    { icon: CheckCircle, label: "Today's Attendance", value: `${stats.todayAttendance}`, color: "text-success", bgColor: "bg-success/10", trend: "Present today" },
+    { icon: CheckCircle, label: "Present Today", value: stats.todayPresent, color: "text-success", bgColor: "bg-success/10", trend: "Students" },
   ];
 
   const recentActivities: Activity[] = [
@@ -103,7 +107,7 @@ const AdminDashboard = () => {
     { id: "2", title: "Teacher John marked attendance for Class 10A", time: "15 minutes ago", type: "success" },
     { id: "3", title: "Results published for Mid-term Exams", time: "1 hour ago", type: "success" },
     { id: "4", title: "Parent meeting scheduled for next week", time: "2 hours ago", type: "warning" },
-    { id: "5", title: "3 students marked absent today", time: "3 hours ago", type: "error" },
+    { id: "5", title: `${stats.todayAbsent} students marked absent today`, time: "3 hours ago", type: "error" },
   ];
 
   const notifications = [
@@ -116,8 +120,8 @@ const AdminDashboard = () => {
   const quickActions = [
     { label: "Add Student", link: "/admin/students", icon: GraduationCap },
     { label: "Add Teacher", link: "/admin/teachers", icon: UserCheck },
+    { label: "View Attendance", link: "/admin/attendance", icon: Calendar },
     { label: "View Admissions", link: "/admin/admissions", icon: FileText },
-    { label: "Create Announcement", link: "/admin/announcements", icon: Bell },
   ];
 
   if (loading) {
@@ -129,6 +133,10 @@ const AdminDashboard = () => {
       </AdminLayout>
     );
   }
+
+  const attendanceRate = (stats.todayPresent + stats.todayAbsent + stats.todayLate) > 0 
+    ? Math.round((stats.todayPresent / (stats.todayPresent + stats.todayAbsent + stats.todayLate)) * 100) 
+    : 0;
 
   return (
     <AdminLayout title="Admin Dashboard" description="Welcome to the Super Admin Panel">
@@ -165,6 +173,70 @@ const AdminDashboard = () => {
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6">
+        {/* Today's Absent Students */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserX className="w-5 h-5 text-destructive" />
+              Today's Absent Students
+              {stats.todayAbsent > 0 && (
+                <Badge variant="destructive" className="ml-2">{stats.todayAbsent}</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>Students marked absent today</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AbsentStudentsList date={new Date()} showTitle={false} maxItems={5} />
+            {stats.todayAbsent > 5 && (
+              <Button 
+                variant="link" 
+                className="w-full mt-4"
+                onClick={() => navigate("/admin/attendance")}
+              >
+                View all {stats.todayAbsent} absent students →
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Attendance Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
+              Attendance Summary
+            </CardTitle>
+            <CardDescription>Today's overview</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Present</span>
+                <span className="font-semibold text-success">{stats.todayPresent}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Absent</span>
+                <span className="font-semibold text-destructive">{stats.todayAbsent}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Late</span>
+                <span className="font-semibold text-warning">{stats.todayLate}</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-success" style={{ width: `${attendanceRate}%` }} />
+              </div>
+              <p className="text-xs text-muted-foreground text-center">{attendanceRate}% attendance rate today</p>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => navigate("/admin/attendance")}
+              >
+                View Full Attendance
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Recent Activity */}
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -215,39 +287,8 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Attendance Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-primary" />
-              Attendance Summary
-            </CardTitle>
-            <CardDescription>Today's overview</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Present</span>
-                <span className="font-semibold text-success">{stats.todayAttendance}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Absent</span>
-                <span className="font-semibold text-destructive">3</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Late</span>
-                <span className="font-semibold text-warning">5</span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-success" style={{ width: "92%" }} />
-              </div>
-              <p className="text-xs text-muted-foreground text-center">92% attendance rate today</p>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Pending Tasks */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-warning" />
@@ -256,7 +297,7 @@ const AdminDashboard = () => {
             <CardDescription>Items requiring attention</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="grid md:grid-cols-2 gap-3">
               {stats.pendingAdmissions > 0 && (
                 <div className="flex items-center justify-between p-3 rounded-lg bg-warning/10 border border-warning/20">
                   <div className="flex items-center gap-3">
@@ -265,6 +306,17 @@ const AdminDashboard = () => {
                   </div>
                   <Button size="sm" variant="outline" onClick={() => navigate("/admin/admissions")}>
                     Review
+                  </Button>
+                </div>
+              )}
+              {stats.todayAbsent > 0 && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <div className="flex items-center gap-3">
+                    <UserX className="w-5 h-5 text-destructive" />
+                    <span className="text-sm font-medium">{stats.todayAbsent} students absent today</span>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => navigate("/admin/attendance")}>
+                    Notify Parents
                   </Button>
                 </div>
               )}
