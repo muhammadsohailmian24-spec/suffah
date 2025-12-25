@@ -267,7 +267,7 @@ const StudentFees = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₦{stats.totalFees.toLocaleString()}</div>
+              <div className="text-2xl font-bold">PKR {stats.totalFees.toLocaleString()}</div>
             </CardContent>
           </Card>
           <Card>
@@ -278,7 +278,7 @@ const StudentFees = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">₦{stats.totalPaid.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-green-600">PKR {stats.totalPaid.toLocaleString()}</div>
             </CardContent>
           </Card>
           <Card>
@@ -313,7 +313,7 @@ const StudentFees = () => {
                 <AlertCircle className="h-5 w-5 text-yellow-600" />
                 <div>
                   <p className="font-medium text-yellow-800 dark:text-yellow-200">
-                    Outstanding Balance: ₦{(stats.totalFees - stats.totalPaid).toLocaleString()}
+                    Outstanding Balance: PKR {(stats.totalFees - stats.totalPaid).toLocaleString()}
                   </p>
                   <p className="text-sm text-yellow-700 dark:text-yellow-300">
                     Please contact the school administration for payment options.
@@ -370,7 +370,7 @@ const StudentFees = () => {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <div>₦{fee.final_amount.toLocaleString()}</div>
+                                <div>PKR {fee.final_amount.toLocaleString()}</div>
                                 {fee.discount > 0 && (
                                   <div className="text-xs text-green-600">
                                     -{fee.discount.toLocaleString()} discount
@@ -379,10 +379,10 @@ const StudentFees = () => {
                               </div>
                             </TableCell>
                             <TableCell className="text-green-600">
-                              ₦{paid.toLocaleString()}
+                              PKR {paid.toLocaleString()}
                             </TableCell>
                             <TableCell className={balance > 0 ? "text-destructive font-medium" : "text-green-600"}>
-                              ₦{balance.toLocaleString()}
+                              PKR {balance.toLocaleString()}
                             </TableCell>
                             <TableCell>{new Date(fee.due_date).toLocaleDateString()}</TableCell>
                             <TableCell>{getStatusBadge(fee.status)}</TableCell>
@@ -434,7 +434,7 @@ const StudentFees = () => {
                             {new Date(payment.payment_date).toLocaleDateString()}
                           </TableCell>
                           <TableCell className="font-medium text-green-600">
-                            ₦{payment.amount.toLocaleString()}
+                            PKR {payment.amount.toLocaleString()}
                           </TableCell>
                           <TableCell className="capitalize">{payment.payment_method}</TableCell>
                           <TableCell>{payment.receipt_number || "-"}</TableCell>

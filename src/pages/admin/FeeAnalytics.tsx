@@ -233,7 +233,7 @@ const FeeAnalytics = () => {
     }
   };
 
-  const formatCurrency = (value: number) => `₦${value.toLocaleString()}`;
+  const formatCurrency = (value: number) => `PKR ${value.toLocaleString()}`;
   const formatCurrencyExport = (value: number) => value;
   
   const COLORS = ["hsl(var(--primary))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))"];
@@ -252,9 +252,9 @@ const FeeAnalytics = () => {
 
     const columns = [
       { header: 'Class', key: 'className' },
-      { header: 'Total Fees (₦)', key: 'total', formatter: formatCurrencyExport },
-      { header: 'Collected (₦)', key: 'paid', formatter: formatCurrencyExport },
-      { header: 'Outstanding (₦)', key: 'outstanding', formatter: formatCurrencyExport },
+      { header: 'Total Fees (PKR)', key: 'total', formatter: formatCurrencyExport },
+      { header: 'Collected (PKR)', key: 'paid', formatter: formatCurrencyExport },
+      { header: 'Outstanding (PKR)', key: 'outstanding', formatter: formatCurrencyExport },
       { header: 'Collection Rate (%)', key: 'rate', formatter: (v: number) => v.toFixed(1) },
     ];
 
@@ -281,8 +281,8 @@ const FeeAnalytics = () => {
 
     const columns = [
       { header: 'Month', key: 'month' },
-      { header: 'Assigned (₦)', key: 'assigned', formatter: formatCurrencyExport },
-      { header: 'Collected (₦)', key: 'collected', formatter: formatCurrencyExport },
+      { header: 'Assigned (PKR)', key: 'assigned', formatter: formatCurrencyExport },
+      { header: 'Collected (PKR)', key: 'collected', formatter: formatCurrencyExport },
     ];
 
     const filename = `fee-collection-trends-${new Date().toISOString().split('T')[0]}`;
@@ -309,13 +309,13 @@ const FeeAnalytics = () => {
           lastMonthCollection: stats.lastMonthCollection,
         }],
         columns: [
-          { header: 'Total Assigned (₦)', key: 'totalAssigned', formatter: formatCurrencyExport },
-          { header: 'Total Collected (₦)', key: 'totalCollected', formatter: formatCurrencyExport },
-          { header: 'Outstanding (₦)', key: 'totalOutstanding', formatter: formatCurrencyExport },
+          { header: 'Total Assigned (PKR)', key: 'totalAssigned', formatter: formatCurrencyExport },
+          { header: 'Total Collected (PKR)', key: 'totalCollected', formatter: formatCurrencyExport },
+          { header: 'Outstanding (PKR)', key: 'totalOutstanding', formatter: formatCurrencyExport },
           { header: 'Collection Rate (%)', key: 'collectionRate', formatter: (v: number) => v.toFixed(1) },
           { header: 'Overdue Count', key: 'overdueCount' },
-          { header: 'This Month (₦)', key: 'thisMonthCollection', formatter: formatCurrencyExport },
-          { header: 'Last Month (₦)', key: 'lastMonthCollection', formatter: formatCurrencyExport },
+          { header: 'This Month (PKR)', key: 'thisMonthCollection', formatter: formatCurrencyExport },
+          { header: 'Last Month (PKR)', key: 'lastMonthCollection', formatter: formatCurrencyExport },
         ],
       },
       {
@@ -323,8 +323,8 @@ const FeeAnalytics = () => {
         data: collectionTrends,
         columns: [
           { header: 'Month', key: 'month' },
-          { header: 'Assigned (₦)', key: 'assigned', formatter: formatCurrencyExport },
-          { header: 'Collected (₦)', key: 'collected', formatter: formatCurrencyExport },
+          { header: 'Assigned (PKR)', key: 'assigned', formatter: formatCurrencyExport },
+          { header: 'Collected (PKR)', key: 'collected', formatter: formatCurrencyExport },
         ],
       },
       {
@@ -335,9 +335,9 @@ const FeeAnalytics = () => {
         })),
         columns: [
           { header: 'Class', key: 'className' },
-          { header: 'Total Fees (₦)', key: 'total', formatter: formatCurrencyExport },
-          { header: 'Collected (₦)', key: 'paid', formatter: formatCurrencyExport },
-          { header: 'Outstanding (₦)', key: 'outstanding', formatter: formatCurrencyExport },
+          { header: 'Total Fees (PKR)', key: 'total', formatter: formatCurrencyExport },
+          { header: 'Collected (PKR)', key: 'paid', formatter: formatCurrencyExport },
+          { header: 'Outstanding (PKR)', key: 'outstanding', formatter: formatCurrencyExport },
           { header: 'Collection Rate (%)', key: 'rate', formatter: (v: number) => v.toFixed(1) },
         ],
       },
@@ -347,7 +347,7 @@ const FeeAnalytics = () => {
         columns: [
           { header: 'Status', key: 'status' },
           { header: 'Count', key: 'count' },
-          { header: 'Amount (₦)', key: 'amount', formatter: formatCurrencyExport },
+          { header: 'Amount (PKR)', key: 'amount', formatter: formatCurrencyExport },
         ],
       },
       {
@@ -356,7 +356,7 @@ const FeeAnalytics = () => {
         columns: [
           { header: 'Method', key: 'method' },
           { header: 'Transactions', key: 'count' },
-          { header: 'Amount (₦)', key: 'amount', formatter: formatCurrencyExport },
+          { header: 'Amount (PKR)', key: 'amount', formatter: formatCurrencyExport },
         ],
       },
     ];
@@ -502,7 +502,7 @@ const FeeAnalytics = () => {
                   <AreaChart data={collectionTrends}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="month" className="text-xs" />
-                    <YAxis tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`} className="text-xs" />
+                    <YAxis tickFormatter={(v) => `PKR ${(v / 1000).toFixed(0)}k`} className="text-xs" />
                     <Tooltip 
                       formatter={(value: number) => [formatCurrency(value), ""]}
                       contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
@@ -581,7 +581,7 @@ const FeeAnalytics = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={classOutstanding.slice(0, 8)} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis type="number" tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`} className="text-xs" />
+                      <XAxis type="number" tickFormatter={(v) => `PKR ${(v / 1000).toFixed(0)}k`} className="text-xs" />
                       <YAxis type="category" dataKey="className" width={80} className="text-xs" />
                       <Tooltip 
                         formatter={(value: number) => [formatCurrency(value), ""]}
@@ -613,7 +613,7 @@ const FeeAnalytics = () => {
                     <BarChart data={paymentMethods}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis dataKey="method" className="text-xs capitalize" />
-                      <YAxis yAxisId="left" tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`} className="text-xs" />
+                      <YAxis yAxisId="left" tickFormatter={(v) => `PKR ${(v / 1000).toFixed(0)}k`} className="text-xs" />
                       <YAxis yAxisId="right" orientation="right" className="text-xs" />
                       <Tooltip 
                         formatter={(value: number, name: string) => [

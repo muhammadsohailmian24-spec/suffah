@@ -375,7 +375,7 @@ const FeeManagement = () => {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Fees</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₦{stats.totalFees.toLocaleString()}</div>
+            <div className="text-2xl font-bold">PKR {stats.totalFees.toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card>
@@ -383,7 +383,7 @@ const FeeManagement = () => {
             <CardTitle className="text-sm font-medium text-muted-foreground">Collected</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">₦{stats.collected.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-green-600">PKR {stats.collected.toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card>
@@ -526,7 +526,7 @@ const FeeManagement = () => {
                       <SelectContent>
                         {feeStructures.map((fee) => (
                           <SelectItem key={fee.id} value={fee.id}>
-                            {fee.name} - ₦{fee.amount.toLocaleString()}
+                            {fee.name} - PKR {fee.amount.toLocaleString()}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -597,10 +597,10 @@ const FeeManagement = () => {
                             </div>
                           </TableCell>
                           <TableCell>{sf.fee_structure?.name}</TableCell>
-                          <TableCell>₦{sf.final_amount.toLocaleString()}</TableCell>
-                          <TableCell className="text-green-600">₦{paid.toLocaleString()}</TableCell>
+                          <TableCell>PKR {sf.final_amount.toLocaleString()}</TableCell>
+                          <TableCell className="text-green-600">PKR {paid.toLocaleString()}</TableCell>
                           <TableCell className={balance > 0 ? "text-destructive" : ""}>
-                            ₦{balance.toLocaleString()}
+                            PKR {balance.toLocaleString()}
                           </TableCell>
                           <TableCell>{new Date(sf.due_date).toLocaleDateString()}</TableCell>
                           <TableCell>{getStatusBadge(sf.status)}</TableCell>
@@ -728,7 +728,7 @@ const FeeManagement = () => {
                         <TableCell>
                           <Badge variant="outline">{fee.fee_type}</Badge>
                         </TableCell>
-                        <TableCell>₦{fee.amount.toLocaleString()}</TableCell>
+                        <TableCell>PKR {fee.amount.toLocaleString()}</TableCell>
                         <TableCell>{fee.due_date ? new Date(fee.due_date).toLocaleDateString() : "-"}</TableCell>
                         <TableCell className="text-muted-foreground">{fee.description || "-"}</TableCell>
                       </TableRow>
@@ -788,7 +788,7 @@ const FeeManagement = () => {
                             </div>
                           </TableCell>
                           <TableCell>{new Date(payment.payment_date).toLocaleString()}</TableCell>
-                          <TableCell className="text-green-600 font-medium">₦{payment.amount.toLocaleString()}</TableCell>
+                          <TableCell className="text-green-600 font-medium">PKR {payment.amount.toLocaleString()}</TableCell>
                           <TableCell>
                             <Badge variant="secondary">{payment.payment_method}</Badge>
                           </TableCell>
