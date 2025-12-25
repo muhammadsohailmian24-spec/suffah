@@ -24,6 +24,7 @@ import SystemSettings from "./pages/admin/SystemSettings";
 import RolesManagement from "./pages/admin/RolesManagement";
 import FeeManagement from "./pages/admin/FeeManagement";
 import FeeAnalytics from "./pages/admin/FeeAnalytics";
+import AttendanceOverview from "./pages/admin/AttendanceOverview";
 import TeacherAttendance from "./pages/teacher/Attendance";
 import TeacherAssignments from "./pages/teacher/Assignments";
 import TeacherMaterials from "./pages/teacher/Materials";
@@ -36,6 +37,7 @@ import StudentAssignments from "./pages/student/Assignments";
 import StudentResults from "./pages/student/Results";
 import StudentTimetable from "./pages/student/Timetable";
 import StudentFees from "./pages/student/Fees";
+import StudentAttendance from "./pages/student/Attendance";
 import ParentChildren from "./pages/parent/Children";
 import ParentAttendance from "./pages/parent/Attendance";
 import ParentResults from "./pages/parent/Results";
@@ -75,6 +77,7 @@ const App = () => (
           <Route path="/admin/roles" element={<RolesManagement />} />
           <Route path="/admin/fees" element={<FeeManagement />} />
           <Route path="/admin/fee-analytics" element={<FeeAnalytics />} />
+          <Route path="/admin/attendance" element={<AttendanceOverview />} />
           {/* Teacher Routes */}
           <Route path="/teacher/attendance" element={<TeacherAttendance />} />
           <Route path="/teacher/assignments" element={<TeacherAssignments />} />
@@ -89,6 +92,7 @@ const App = () => (
           <Route path="/student/results" element={<StudentResults />} />
           <Route path="/student/timetable" element={<StudentTimetable />} />
           <Route path="/student/fees" element={<StudentFees />} />
+          <Route path="/student/attendance" element={<StudentAttendance />} />
           {/* Parent Routes */}
           <Route path="/parent/children" element={<ParentChildren />} />
           <Route path="/parent/attendance/:studentId" element={<ParentAttendance />} />

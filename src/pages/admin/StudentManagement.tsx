@@ -69,6 +69,7 @@ const StudentManagement = () => {
     email: "",
     password: "",
     phone: "",
+    student_id: "",
     class_id: "",
   });
 
@@ -154,6 +155,7 @@ const StudentManagement = () => {
           phone: addFormData.phone || undefined,
           role: "student",
           roleSpecificData: {
+            student_id: addFormData.student_id || undefined,
             class_id: addFormData.class_id && addFormData.class_id !== "none" ? addFormData.class_id : null,
           },
         },
@@ -270,6 +272,7 @@ const StudentManagement = () => {
       email: "",
       password: "",
       phone: "",
+      student_id: "",
       class_id: "",
     });
   };
@@ -482,6 +485,15 @@ const StudentManagement = () => {
                   onChange={(e) => setAddFormData(p => ({ ...p, password: e.target.value }))}
                   placeholder="Min. 6 characters"
                   minLength={6}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Student ID *</Label>
+                <Input
+                  value={addFormData.student_id}
+                  onChange={(e) => setAddFormData(p => ({ ...p, student_id: e.target.value }))}
+                  placeholder="e.g., STU2025001"
                   required
                 />
               </div>
