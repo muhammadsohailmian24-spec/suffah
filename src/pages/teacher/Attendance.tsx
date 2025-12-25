@@ -16,12 +16,21 @@ interface Student {
   id: string;
   student_id: string;
   user_id: string;
+  class_id: string | null;
   profiles?: { full_name: string };
 }
 
 interface AttendanceRecord {
+  id: string;
   student_id: string;
-  status: "present" | "absent" | "late" | "excused";
+  status: string;
+  date: string;
+}
+
+interface ClassOption {
+  id: string;
+  name: string;
+  section: string | null;
 }
 
 const TeacherAttendance = () => {
@@ -29,48 +38,131 @@ const TeacherAttendance = () => {
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<Record<string, string>>({});
+  const [existingRecords, setExistingRecords] = useState<Record<string, string>>({});
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedClass, setSelectedClass] = useState<string | null>(null);
+  const [classes, setClasses] = useState<ClassOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [teacherId, setTeacherId] = useState<string | null>(null);
 
   useEffect(() => {
     checkAuthAndFetch();
   }, []);
+
+  useEffect(() => {
+    if (selectedClass) {
+      fetchStudents();
+    }
+  }, [selectedClass, selectedDate]);
 
   const checkAuthAndFetch = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { navigate("/auth"); return; }
 
     const { data: roleData } = await supabase
-      .from("user_roles" as any)
+      .from("user_roles")
       .select("role")
       .eq("user_id", session.user.id)
       .maybeSingle();
 
-    if (!roleData || (roleData as any).role !== "teacher") {
+    if (!roleData || roleData.role !== "teacher") {
       navigate("/dashboard");
       return;
     }
 
-    fetchStudents();
+    // Get teacher ID
+    const { data: teacherData } = await supabase
+      .from("teachers")
+      .select("id")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+
+    if (teacherData) {
+      setTeacherId(teacherData.id);
+    }
+
+    // Fetch classes
+    const { data: classesData } = await supabase
+      .from("classes")
+      .select("id, name, section")
+      .order("grade_level", { ascending: true });
+
+    if (classesData) {
+      setClasses(classesData);
+      if (classesData.length > 0) {
+        setSelectedClass(classesData[0].id);
+      }
+    }
+
+    setLoading(false);
   };
 
   const fetchStudents = async () => {
-    // For demo, fetch all students
-    const { data, error } = await supabase
-      .from("students" as any)
-      .select("id, student_id, user_id")
+    if (!selectedClass) return;
+
+    setLoading(true);
+
+    // Fetch students in the selected class
+    const { data: studentsData, error } = await supabase
+      .from("students")
+      .select("id, student_id, user_id, class_id")
+      .eq("class_id", selectedClass)
+      .eq("status", "active")
       .order("student_id", { ascending: true });
 
-    if (!error && data) {
-      setStudents(data as unknown as Student[]);
-      // Initialize attendance state
-      const initialAttendance: Record<string, string> = {};
-      (data as any[]).forEach((s: any) => {
-        initialAttendance[s.id] = "present";
-      });
-      setAttendance(initialAttendance);
+    if (error) {
+      console.error("Error fetching students:", error);
+      setLoading(false);
+      return;
     }
+
+    // Fetch profiles for student names
+    if (studentsData && studentsData.length > 0) {
+      const userIds = studentsData.map(s => s.user_id);
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("user_id, full_name")
+        .in("user_id", userIds);
+
+      const studentsWithNames = studentsData.map(student => ({
+        ...student,
+        profiles: profilesData?.find(p => p.user_id === student.user_id),
+      }));
+
+      setStudents(studentsWithNames);
+
+      // Fetch existing attendance records for this date
+      const studentIds = studentsData.map(s => s.id);
+      const { data: existingAttendance } = await supabase
+        .from("attendance")
+        .select("id, student_id, status")
+        .eq("date", selectedDate)
+        .eq("class_id", selectedClass)
+        .in("student_id", studentIds);
+
+      // Initialize attendance state
+      const attendanceState: Record<string, string> = {};
+      const existingState: Record<string, string> = {};
+      
+      studentsData.forEach(s => {
+        const existing = existingAttendance?.find(a => a.student_id === s.id);
+        if (existing) {
+          attendanceState[s.id] = existing.status;
+          existingState[s.id] = existing.id;
+        } else {
+          attendanceState[s.id] = "present";
+        }
+      });
+
+      setAttendance(attendanceState);
+      setExistingRecords(existingState);
+    } else {
+      setStudents([]);
+      setAttendance({});
+      setExistingRecords({});
+    }
+
     setLoading(false);
   };
 
@@ -79,33 +171,99 @@ const TeacherAttendance = () => {
   };
 
   const saveAttendance = async () => {
+    if (!selectedClass) {
+      toast({
+        title: "Error",
+        description: "Please select a class first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
-    
-    // Get teacher ID
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
 
-    const { data: teacherData } = await supabase
-      .from("teachers" as any)
-      .select("id")
-      .eq("user_id", session.user.id)
-      .maybeSingle();
+    try {
+      const updates: any[] = [];
+      const inserts: any[] = [];
+      const absentStudentIds: string[] = [];
 
-    const records = Object.entries(attendance).map(([studentId, status]) => ({
-      student_id: studentId,
-      class_id: null, // Would be set based on selected class
-      date: selectedDate,
-      status,
-      marked_by: teacherData ? (teacherData as any).id : null,
-    }));
+      Object.entries(attendance).forEach(([studentId, status]) => {
+        const record = {
+          student_id: studentId,
+          class_id: selectedClass,
+          date: selectedDate,
+          status,
+          marked_by: teacherId,
+        };
 
-    // For demo purposes, just show success
-    toast({
-      title: "Attendance Saved",
-      description: `Attendance for ${selectedDate} has been recorded.`,
-    });
-    
-    setSaving(false);
+        if (existingRecords[studentId]) {
+          // Update existing record
+          updates.push({ id: existingRecords[studentId], ...record });
+        } else {
+          // Insert new record
+          inserts.push(record);
+        }
+
+        if (status === "absent") {
+          absentStudentIds.push(studentId);
+        }
+      });
+
+      // Perform updates
+      for (const update of updates) {
+        const { id, ...data } = update;
+        const { error } = await supabase
+          .from("attendance")
+          .update(data)
+          .eq("id", id);
+
+        if (error) throw error;
+      }
+
+      // Perform inserts
+      if (inserts.length > 0) {
+        const { error } = await supabase
+          .from("attendance")
+          .insert(inserts);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Attendance Saved",
+        description: `Attendance for ${selectedDate} has been recorded successfully.`,
+      });
+
+      // Automatically send notifications for absent students
+      if (absentStudentIds.length > 0) {
+        try {
+          const { data, error } = await supabase.functions.invoke("send-attendance-notification", {
+            body: { date: selectedDate },
+          });
+
+          if (!error && data) {
+            toast({
+              title: "Parents Notified",
+              description: `Sent ${data.emailsSent || 0} emails and ${data.whatsappSent || 0} WhatsApp messages to parents.`,
+            });
+          }
+        } catch (notifyError) {
+          console.error("Error sending notifications:", notifyError);
+        }
+      }
+
+      // Refresh the data
+      await fetchStudents();
+    } catch (error: any) {
+      console.error("Error saving attendance:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save attendance",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -129,6 +287,8 @@ const TeacherAttendance = () => {
     { label: "Late", value: Object.values(attendance).filter(s => s === "late").length, icon: Clock, color: "text-warning" },
     { label: "Excused", value: Object.values(attendance).filter(s => s === "excused").length, icon: Calendar, color: "text-info" },
   ];
+
+  const hasExistingAttendance = Object.keys(existingRecords).length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -162,20 +322,47 @@ const TeacherAttendance = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
               <h1 className="font-heading text-3xl font-bold mb-2">Mark Attendance</h1>
-              <p className="text-muted-foreground">Record daily student attendance</p>
+              <p className="text-muted-foreground">
+                {hasExistingAttendance 
+                  ? "Edit existing attendance records" 
+                  : "Record daily student attendance"}
+              </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <Select value={selectedClass || ""} onValueChange={setSelectedClass}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Select Class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map(cls => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.name}{cls.section ? ` - ${cls.section}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="px-4 py-2 rounded-lg border border-border bg-background"
               />
-              <Button onClick={saveAttendance} disabled={saving} className="hero-gradient text-primary-foreground">
-                {saving ? "Saving..." : "Save Attendance"}
+              <Button onClick={saveAttendance} disabled={saving || students.length === 0} className="hero-gradient text-primary-foreground">
+                {saving ? "Saving..." : hasExistingAttendance ? "Update Attendance" : "Save Attendance"}
               </Button>
             </div>
           </div>
+
+          {hasExistingAttendance && (
+            <Card className="mb-6 border-info/50 bg-info/5">
+              <CardContent className="p-4 flex items-center gap-3">
+                <Calendar className="w-5 h-5 text-info" />
+                <p className="text-sm">
+                  Attendance has already been marked for this date. You can edit the records and save changes.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -195,24 +382,34 @@ const TeacherAttendance = () => {
           <Card>
             <CardHeader>
               <CardTitle>Student Attendance</CardTitle>
-              <CardDescription>Mark attendance for each student</CardDescription>
+              <CardDescription>
+                {students.length > 0 
+                  ? `${students.length} students in selected class` 
+                  : "Select a class to view students"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <div className="p-8 text-center">
                   <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
                 </div>
+              ) : !selectedClass ? (
+                <div className="p-8 text-center">
+                  <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">Please select a class to mark attendance</p>
+                </div>
               ) : students.length === 0 ? (
                 <div className="p-8 text-center">
                   <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No students found</p>
+                  <p className="text-muted-foreground">No students found in this class</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Student ID</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Current Status</TableHead>
                       <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -220,6 +417,7 @@ const TeacherAttendance = () => {
                     {students.map((student) => (
                       <TableRow key={student.id}>
                         <TableCell className="font-medium">{student.student_id}</TableCell>
+                        <TableCell>{student.profiles?.full_name || "N/A"}</TableCell>
                         <TableCell>{getStatusBadge(attendance[student.id] || "present")}</TableCell>
                         <TableCell>
                           <Select
