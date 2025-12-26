@@ -263,7 +263,7 @@ const StudentAssignments = () => {
                       const deadline = getDeadlineStatus(assignment.due_date);
                       const submission = submissions[assignment.id];
                       const isSubmitted = !!submission;
-                      const isGraded = submission?.marks_obtained !== null;
+                      const isGraded = isSubmitted && submission?.marks_obtained !== null;
                       
                       return (
                         <TableRow key={assignment.id}>
