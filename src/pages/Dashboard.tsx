@@ -172,13 +172,13 @@ const Dashboard = () => {
             const { data: childrenData } = await supabase.from("student_parents" as any).select("student_id").eq("parent_id", parentId);
             const childCount = (childrenData || []).length;
             
-            const { data: notifData } = await supabase.from("notifications" as any).select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_read", false);
+            const { data: notifData } = await supabase.from("notifications" as any).select("id").eq("user_id", userId).eq("is_read", false);
             
             setStats([
               { icon: Users, value: String(childCount), label: "Children", trend: "Enrolled" },
               { icon: Clock, value: "-", label: "Attendance", trend: "Average" },
               { icon: Award, value: "-", label: "Grade", trend: "Average" },
-              { icon: Bell, value: String(notifData?.count || 0), label: "Unread", trend: "Notifications" },
+              { icon: Bell, value: String((notifData || []).length), label: "Unread", trend: "Notifications" },
             ]);
           }
           break;
