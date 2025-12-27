@@ -105,17 +105,46 @@ const TeacherExams = () => {
     if (teacher) {
       setTeacherId(teacher.id);
       console.log("Teacher ID set:", teacher.id);
+
+      // Fetch only classes and subjects assigned to this teacher via timetable
+      const { data: timetableData } = await supabase
+        .from("timetable")
+        .select("class_id, subject_id, classes(id, name), subjects(id, name)")
+        .eq("teacher_id", teacher.id);
+
+      if (timetableData) {
+        // Get unique classes from timetable
+        const uniqueClasses = new Map<string, Class>();
+        const uniqueSubjects = new Map<string, Subject>();
+        const assignedClassIds: string[] = [];
+
+        timetableData.forEach((entry: any) => {
+          if (entry.classes && !uniqueClasses.has(entry.class_id)) {
+            uniqueClasses.set(entry.class_id, { id: entry.classes.id, name: entry.classes.name });
+            assignedClassIds.push(entry.class_id);
+          }
+          if (entry.subjects && !uniqueSubjects.has(entry.subject_id)) {
+            uniqueSubjects.set(entry.subject_id, { id: entry.subjects.id, name: entry.subjects.name });
+          }
+        });
+
+        setClasses(Array.from(uniqueClasses.values()));
+        setSubjects(Array.from(uniqueSubjects.values()));
+
+        // Fetch exams only for assigned classes
+        if (assignedClassIds.length > 0) {
+          const { data: examsData } = await supabase
+            .from("exams")
+            .select(`*, classes(name), subjects(name)`)
+            .in("class_id", assignedClassIds)
+            .order("exam_date", { ascending: false });
+          setExams((examsData as Exam[]) || []);
+        } else {
+          setExams([]);
+        }
+      }
     }
 
-    const [classesRes, subjectsRes, examsRes] = await Promise.all([
-      supabase.from("classes").select("id, name").order("name"),
-      supabase.from("subjects").select("id, name").order("name"),
-      supabase.from("exams").select(`*, classes(name), subjects(name)`).order("exam_date", { ascending: false }),
-    ]);
-
-    setClasses(classesRes.data || []);
-    setSubjects(subjectsRes.data || []);
-    setExams((examsRes.data as Exam[]) || []);
     setLoading(false);
   };
 
