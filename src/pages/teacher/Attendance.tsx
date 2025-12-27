@@ -82,16 +82,30 @@ const TeacherAttendance = () => {
       setTeacherId(teacherData.id);
     }
 
-    // Fetch classes
-    const { data: classesData } = await supabase
-      .from("classes")
-      .select("id, name, section")
-      .order("grade_level", { ascending: true });
+    // Fetch only classes assigned to this teacher via timetable
+    if (teacherData) {
+      const { data: timetableData } = await supabase
+        .from("timetable")
+        .select("class_id, classes(id, name, section)")
+        .eq("teacher_id", teacherData.id);
 
-    if (classesData) {
-      setClasses(classesData);
-      if (classesData.length > 0) {
-        setSelectedClass(classesData[0].id);
+      if (timetableData) {
+        // Get unique classes from timetable entries
+        const uniqueClasses = new Map<string, ClassOption>();
+        timetableData.forEach((entry: any) => {
+          if (entry.classes && !uniqueClasses.has(entry.class_id)) {
+            uniqueClasses.set(entry.class_id, {
+              id: entry.classes.id,
+              name: entry.classes.name,
+              section: entry.classes.section,
+            });
+          }
+        });
+        const classesArray = Array.from(uniqueClasses.values());
+        setClasses(classesArray);
+        if (classesArray.length > 0) {
+          setSelectedClass(classesArray[0].id);
+        }
       }
     }
 
