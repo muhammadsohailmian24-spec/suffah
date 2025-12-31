@@ -235,57 +235,87 @@ const TeacherExams = () => {
   };
 
   const handleDownloadAwardList = async (exam: Exam) => {
-    // Fetch students for this class
-    const { data: studentsData } = await supabase
+    // Fetch students for this class with proper join
+    const { data: studentsData, error: studentsError } = await supabase
       .from("students")
-      .select(`
-        id,
-        student_id,
-        profiles!students_user_id_fkey(full_name),
-        classes(name, section)
-      `)
+      .select("id, student_id, user_id, class_id")
       .eq("class_id", exam.class_id)
       .eq("status", "active")
       .order("student_id");
+
+    if (studentsError) {
+      console.error("Error fetching students:", studentsError);
+      toast({ title: "Error", description: "Failed to fetch students", variant: "destructive" });
+      return;
+    }
 
     if (!studentsData || studentsData.length === 0) {
       toast({ title: "No students", description: "No students found in this class", variant: "destructive" });
       return;
     }
 
+    // Fetch profiles separately
+    const userIds = studentsData.map(s => s.user_id);
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .in("user_id", userIds);
+
+    const profileMap = new Map(profilesData?.map(p => [p.user_id, p.full_name]) || []);
+
+    // Fetch class info
+    const { data: classData } = await supabase
+      .from("classes")
+      .select("name, section")
+      .eq("id", exam.class_id)
+      .single();
+
     // Fetch father's name from parent records
     const studentIds = studentsData.map(s => s.id);
     const { data: parentLinks } = await supabase
       .from("student_parents")
-      .select(`
-        student_id,
-        parents!inner(
-          profiles!parents_user_id_fkey(full_name)
-        )
-      `)
+      .select("student_id, parent_id")
       .in("student_id", studentIds)
       .eq("is_primary", true);
 
     const fatherNameMap = new Map<string, string>();
-    parentLinks?.forEach((link: any) => {
-      fatherNameMap.set(link.student_id, link.parents?.profiles?.full_name || "");
-    });
+    if (parentLinks && parentLinks.length > 0) {
+      const parentIds = parentLinks.map(p => p.parent_id);
+      const { data: parents } = await supabase
+        .from("parents")
+        .select("id, user_id")
+        .in("id", parentIds);
 
-    const students = studentsData.map((student: any, index) => ({
+      if (parents) {
+        const parentUserIds = parents.map(p => p.user_id);
+        const { data: parentProfiles } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", parentUserIds);
+
+        const parentProfileMap = new Map(parentProfiles?.map(p => [p.user_id, p.full_name]) || []);
+        const parentIdToName = new Map(parents.map(p => [p.id, parentProfileMap.get(p.user_id) || ""]));
+
+        parentLinks.forEach(link => {
+          fatherNameMap.set(link.student_id, parentIdToName.get(link.parent_id) || "");
+        });
+      }
+    }
+
+    const students = studentsData.map((student, index) => ({
       sr_no: index + 1,
       student_id: student.student_id,
-      name: student.profiles?.full_name || "",
+      name: profileMap.get(student.user_id) || "",
       father_name: fatherNameMap.get(student.id) || "",
     }));
 
     const currentYear = new Date().getFullYear();
-    const classInfo = studentsData[0]?.classes;
 
     await downloadAwardList({
       session: `${currentYear}`,
       date: format(parseISO(exam.exam_date), "dd-MMM-yyyy"),
-      className: classInfo?.name || exam.classes?.name || "",
-      section: classInfo?.section || "",
+      className: classData?.name || exam.classes?.name || "",
+      section: classData?.section || "",
       subject: exam.subjects?.name || "",
       teacherName: "",
       marks: String(exam.max_marks || ""),

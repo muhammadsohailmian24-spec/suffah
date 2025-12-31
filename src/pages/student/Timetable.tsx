@@ -2,97 +2,118 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
-  GraduationCap, Bell, LogOut, BookOpen, FileText, Award, Calendar, Clock
+  GraduationCap, Bell, LogOut, BookOpen, FileText, Award, Calendar, Clock, ClipboardList
 } from "lucide-react";
+
+interface TimetableEntry {
+  id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  room_number: string | null;
+  subjects: { name: string } | null;
+  teachers: { id: string } | null;
+  teacherName?: string;
+}
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const StudentTimetable = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [entries, setEntries] = useState<TimetableEntry[]>([]);
+  const [className, setClassName] = useState("");
 
   useEffect(() => {
-    checkAuth();
+    checkAuthAndFetch();
   }, []);
 
-  const checkAuth = async () => {
+  const checkAuthAndFetch = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { navigate("/auth"); return; }
 
-    const { data: roleData } = await supabase.from("user_roles" as any).select("role").eq("user_id", session.user.id).maybeSingle();
-    if (!roleData || (roleData as any).role !== "student") { navigate("/dashboard"); return; }
+    const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", session.user.id).maybeSingle();
+    if (!roleData || roleData.role !== "student") { navigate("/dashboard"); return; }
+
+    // Get student's class
+    const { data: student } = await supabase
+      .from("students")
+      .select("class_id, classes(name)")
+      .eq("user_id", session.user.id)
+      .single();
+
+    if (!student?.class_id) {
+      setLoading(false);
+      return;
+    }
+
+    setClassName((student.classes as any)?.name || "");
+
+    // Fetch timetable for student's class
+    const { data: timetableData } = await supabase
+      .from("timetable")
+      .select(`
+        id,
+        day_of_week,
+        start_time,
+        end_time,
+        room_number,
+        subjects(name),
+        teachers(id, user_id)
+      `)
+      .eq("class_id", student.class_id)
+      .order("day_of_week")
+      .order("start_time");
+
+    if (timetableData && timetableData.length > 0) {
+      // Fetch teacher names
+      const teacherIds = [...new Set(timetableData.map((t: any) => t.teachers?.user_id).filter(Boolean))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, full_name")
+        .in("user_id", teacherIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
+
+      const entriesWithNames = timetableData.map((entry: any) => ({
+        ...entry,
+        teacherName: entry.teachers?.user_id ? profileMap.get(entry.teachers.user_id) || "Teacher" : "Teacher"
+      }));
+
+      setEntries(entriesWithNames);
+    }
 
     setLoading(false);
   };
 
   const handleSignOut = async () => { await supabase.auth.signOut(); navigate("/"); };
 
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  
-  const mockTimetable = {
-    'Monday': [
-      { time: '08:00 - 08:45', subject: 'Mathematics', teacher: 'Mr. Ahmed', room: '101' },
-      { time: '08:45 - 09:30', subject: 'Physics', teacher: 'Dr. Khan', room: '102' },
-      { time: '09:45 - 10:30', subject: 'Chemistry', teacher: 'Mrs. Fatima', room: '103' },
-      { time: '10:30 - 11:15', subject: 'English', teacher: 'Ms. Sarah', room: '104' },
-      { time: '11:30 - 12:15', subject: 'Urdu', teacher: 'Mr. Ali', room: '105' },
-      { time: '12:15 - 13:00', subject: 'Islamiat', teacher: 'Maulana Tariq', room: '106' },
-    ],
-    'Tuesday': [
-      { time: '08:00 - 08:45', subject: 'English', teacher: 'Ms. Sarah', room: '104' },
-      { time: '08:45 - 09:30', subject: 'Mathematics', teacher: 'Mr. Ahmed', room: '101' },
-      { time: '09:45 - 10:30', subject: 'Biology', teacher: 'Dr. Aisha', room: '107' },
-      { time: '10:30 - 11:15', subject: 'Physics', teacher: 'Dr. Khan', room: '102' },
-      { time: '11:30 - 12:15', subject: 'Computer', teacher: 'Mr. Usman', room: 'Lab 1' },
-      { time: '12:15 - 13:00', subject: 'Chemistry', teacher: 'Mrs. Fatima', room: '103' },
-    ],
-    'Wednesday': [
-      { time: '08:00 - 08:45', subject: 'Chemistry', teacher: 'Mrs. Fatima', room: '103' },
-      { time: '08:45 - 09:30', subject: 'Urdu', teacher: 'Mr. Ali', room: '105' },
-      { time: '09:45 - 10:30', subject: 'Mathematics', teacher: 'Mr. Ahmed', room: '101' },
-      { time: '10:30 - 11:15', subject: 'Biology', teacher: 'Dr. Aisha', room: '107' },
-      { time: '11:30 - 12:15', subject: 'English', teacher: 'Ms. Sarah', room: '104' },
-      { time: '12:15 - 13:00', subject: 'Physics', teacher: 'Dr. Khan', room: '102' },
-    ],
-    'Thursday': [
-      { time: '08:00 - 08:45', subject: 'Physics Lab', teacher: 'Dr. Khan', room: 'Lab 2' },
-      { time: '08:45 - 09:30', subject: 'Physics Lab', teacher: 'Dr. Khan', room: 'Lab 2' },
-      { time: '09:45 - 10:30', subject: 'English', teacher: 'Ms. Sarah', room: '104' },
-      { time: '10:30 - 11:15', subject: 'Mathematics', teacher: 'Mr. Ahmed', room: '101' },
-      { time: '11:30 - 12:15', subject: 'Islamiat', teacher: 'Maulana Tariq', room: '106' },
-      { time: '12:15 - 13:00', subject: 'Computer', teacher: 'Mr. Usman', room: 'Lab 1' },
-    ],
-    'Friday': [
-      { time: '08:00 - 08:45', subject: 'Juma Prayer', teacher: '-', room: 'Mosque' },
-      { time: '14:00 - 14:45', subject: 'Chemistry Lab', teacher: 'Mrs. Fatima', room: 'Lab 3' },
-      { time: '14:45 - 15:30', subject: 'Chemistry Lab', teacher: 'Mrs. Fatima', room: 'Lab 3' },
-      { time: '15:45 - 16:30', subject: 'Biology', teacher: 'Dr. Aisha', room: '107' },
-    ],
-    'Saturday': [
-      { time: '08:00 - 08:45', subject: 'Mathematics', teacher: 'Mr. Ahmed', room: '101' },
-      { time: '08:45 - 09:30', subject: 'Physics', teacher: 'Dr. Khan', room: '102' },
-      { time: '09:45 - 10:30', subject: 'Computer Lab', teacher: 'Mr. Usman', room: 'Lab 1' },
-      { time: '10:30 - 11:15', subject: 'Computer Lab', teacher: 'Mr. Usman', room: 'Lab 1' },
-    ],
-  };
+  const todayIndex = new Date().getDay();
+  const todayEntries = entries.filter(e => e.day_of_week === todayIndex);
+
+  const groupedByDay = entries.reduce((acc, entry) => {
+    const day = entry.day_of_week;
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(entry);
+    return acc;
+  }, {} as Record<number, TimetableEntry[]>);
 
   const getSubjectColor = (subject: string) => {
     const colors: Record<string, string> = {
       'Mathematics': 'bg-primary/10 border-l-primary',
-      'Physics': 'bg-info/10 border-l-info',
-      'Chemistry': 'bg-warning/10 border-l-warning',
-      'Biology': 'bg-success/10 border-l-success',
-      'English': 'bg-purple-100 border-l-purple-500',
-      'Urdu': 'bg-orange-100 border-l-orange-500',
-      'Computer': 'bg-cyan-100 border-l-cyan-500',
-      'Islamiat': 'bg-emerald-100 border-l-emerald-500',
+      'Physics': 'bg-blue-100 border-l-blue-500 dark:bg-blue-900/30',
+      'Chemistry': 'bg-amber-100 border-l-amber-500 dark:bg-amber-900/30',
+      'Biology': 'bg-green-100 border-l-green-500 dark:bg-green-900/30',
+      'English': 'bg-purple-100 border-l-purple-500 dark:bg-purple-900/30',
+      'Urdu': 'bg-orange-100 border-l-orange-500 dark:bg-orange-900/30',
+      'Computer': 'bg-cyan-100 border-l-cyan-500 dark:bg-cyan-900/30',
+      'Islamiat': 'bg-emerald-100 border-l-emerald-500 dark:bg-emerald-900/30',
     };
-    return colors[subject.split(' ')[0]] || 'bg-muted border-l-muted-foreground';
+    return colors[subject?.split(' ')[0]] || 'bg-muted border-l-muted-foreground';
   };
-
-  const todayIndex = new Date().getDay();
-  const todayName = days[todayIndex === 0 ? 5 : todayIndex - 1];
 
   return (
     <div className="min-h-screen bg-background">
@@ -117,6 +138,7 @@ const StudentTimetable = () => {
             <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><GraduationCap className="w-5 h-5" />Dashboard</Link>
             <Link to="/student/courses" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><BookOpen className="w-5 h-5" />My Courses</Link>
             <Link to="/student/assignments" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><FileText className="w-5 h-5" />Assignments</Link>
+            <Link to="/student/exams" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><ClipboardList className="w-5 h-5" />Exams</Link>
             <Link to="/student/results" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><Award className="w-5 h-5" />Results</Link>
             <Link to="/student/timetable" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary text-primary-foreground"><Calendar className="w-5 h-5" />Timetable</Link>
           </nav>
@@ -125,38 +147,84 @@ const StudentTimetable = () => {
         <main className="flex-1 p-6 lg:p-8">
           <div className="mb-8">
             <h1 className="font-heading text-3xl font-bold mb-2">Class Timetable</h1>
-            <p className="text-muted-foreground">Your weekly class schedule</p>
+            <p className="text-muted-foreground">{className ? `${className} - Weekly Schedule` : "Your weekly class schedule"}</p>
           </div>
 
           {loading ? (
             <div className="p-8 text-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto" /></div>
+          ) : entries.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <h3 className="text-lg font-semibold mb-2">No Timetable Found</h3>
+                <p className="text-muted-foreground">Your class timetable hasn't been set up yet. Contact your administrator.</p>
+              </CardContent>
+            </Card>
           ) : (
-            <div className="grid lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {days.map((day) => (
-                <Card key={day} className={day === todayName ? 'ring-2 ring-primary' : ''}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{day}</CardTitle>
-                      {day === todayName && <Badge className="bg-primary text-primary-foreground">Today</Badge>}
+            <div className="space-y-6">
+              {/* Today's Classes */}
+              <Card className="border-primary/50 bg-primary/5">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-primary" />
+                    Today's Classes - {DAYS[todayIndex]}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {todayEntries.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">No classes scheduled for today</p>
+                  ) : (
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                      {todayEntries.map(entry => (
+                        <div key={entry.id} className={`p-4 rounded-lg border-l-4 ${getSubjectColor(entry.subjects?.name || '')}`}>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                            <Clock className="w-3 h-3" />
+                            {entry.start_time} - {entry.end_time}
+                          </div>
+                          <p className="font-medium">{entry.subjects?.name}</p>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-xs text-muted-foreground">{entry.teacherName}</span>
+                            {entry.room_number && <Badge variant="outline" className="text-xs">Room {entry.room_number}</Badge>}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {(mockTimetable as any)[day]?.map((slot: any, i: number) => (
-                      <div key={i} className={`p-3 rounded-lg border-l-4 ${getSubjectColor(slot.subject)}`}>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                          <Clock className="w-3 h-3" />
-                          {slot.time}
-                        </div>
-                        <p className="font-medium text-sm">{slot.subject}</p>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-xs text-muted-foreground">{slot.teacher}</span>
-                          <Badge variant="outline" className="text-xs">{slot.room}</Badge>
-                        </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Weekly Schedule */}
+              <div className="grid lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((day) => (
+                  <Card key={day} className={day === todayIndex ? 'ring-2 ring-primary' : ''}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">{DAYS[day]}</CardTitle>
+                        {day === todayIndex && <Badge className="bg-primary text-primary-foreground">Today</Badge>}
                       </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {groupedByDay[day]?.length > 0 ? (
+                        groupedByDay[day].map((entry) => (
+                          <div key={entry.id} className={`p-3 rounded-lg border-l-4 ${getSubjectColor(entry.subjects?.name || '')}`}>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                              <Clock className="w-3 h-3" />
+                              {entry.start_time} - {entry.end_time}
+                            </div>
+                            <p className="font-medium text-sm">{entry.subjects?.name}</p>
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="text-xs text-muted-foreground">{entry.teacherName}</span>
+                              {entry.room_number && <Badge variant="outline" className="text-xs">{entry.room_number}</Badge>}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">No classes</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
           )}
         </main>
