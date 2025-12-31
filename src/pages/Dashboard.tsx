@@ -295,6 +295,7 @@ const Dashboard = () => {
         return [
           { icon: BookOpen, label: "My Courses", desc: "View enrolled courses", color: "bg-primary/10 text-primary", link: "/student/courses" },
           { icon: FileText, label: "Assignments", desc: "View & submit", color: "bg-info/10 text-info", link: "/student/assignments" },
+          { icon: ClipboardList, label: "Exams", desc: "Download roll slips", color: "bg-destructive/10 text-destructive", link: "/student/exams" },
           { icon: Award, label: "Results", desc: "Check grades", color: "bg-warning/10 text-warning", link: "/student/results" },
           { icon: Calendar, label: "Timetable", desc: "View schedule", color: "bg-success/10 text-success", link: "/student/timetable" },
         ];
