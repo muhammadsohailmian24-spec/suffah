@@ -9,10 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Plus, Edit, Trash2, Download } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash2, Download, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 import { downloadAwardList } from "@/utils/generateAwardListPdf";
+import { downloadClassRollNumberSlips } from "@/utils/generateRollNumberSlipPdf";
 
 interface Exam {
   id: string;
@@ -247,6 +248,114 @@ const AdminExams = () => {
     toast({ title: "Downloaded", description: "Award list PDF downloaded successfully" });
   };
 
+  const handleDownloadRollNumberSlips = async (exam: Exam) => {
+    // Fetch students for this class
+    const { data: studentsData, error: studentsError } = await supabase
+      .from("students")
+      .select("id, student_id, user_id, class_id")
+      .eq("class_id", exam.class_id)
+      .eq("status", "active");
+
+    if (studentsError) {
+      console.error("Error fetching students:", studentsError);
+      toast({ title: "Error", description: "Failed to fetch students", variant: "destructive" });
+      return;
+    }
+
+    if (!studentsData || studentsData.length === 0) {
+      toast({ title: "No students", description: "No students found in this class", variant: "destructive" });
+      return;
+    }
+
+    // Fetch profiles
+    const userIds = studentsData.map(s => s.user_id);
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("user_id, full_name, photo_url")
+      .in("user_id", userIds);
+
+    const profileMap = new Map(profilesData?.map(p => [p.user_id, { name: p.full_name, photo: p.photo_url }]) || []);
+
+    // Fetch class info
+    const { data: classData } = await supabase
+      .from("classes")
+      .select("name, section")
+      .eq("id", exam.class_id)
+      .single();
+
+    // Fetch father's name from parent records
+    const studentIds = studentsData.map(s => s.id);
+    const { data: parentLinks } = await supabase
+      .from("student_parents")
+      .select("student_id, parent_id")
+      .in("student_id", studentIds)
+      .eq("is_primary", true);
+
+    const fatherNameMap = new Map<string, string>();
+    if (parentLinks && parentLinks.length > 0) {
+      const parentIds = parentLinks.map(p => p.parent_id);
+      const { data: parents } = await supabase
+        .from("parents")
+        .select("id, user_id")
+        .in("id", parentIds);
+
+      if (parents) {
+        const parentUserIds = parents.map(p => p.user_id);
+        const { data: parentProfiles } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", parentUserIds);
+
+        const parentProfileMap = new Map(parentProfiles?.map(p => [p.user_id, p.full_name]) || []);
+        const parentIdToName = new Map(parents.map(p => [p.id, parentProfileMap.get(p.user_id) || ""]));
+
+        parentLinks.forEach(link => {
+          fatherNameMap.set(link.student_id, parentIdToName.get(link.parent_id) || "");
+        });
+      }
+    }
+
+    // Fetch all exams for this class to create subject schedule
+    const { data: classExams } = await supabase
+      .from("exams")
+      .select("*, subjects(name)")
+      .eq("class_id", exam.class_id)
+      .gte("exam_date", exam.exam_date)
+      .order("exam_date");
+
+    const subjects = classExams?.map(e => ({
+      name: e.subjects?.name || "",
+      date: format(parseISO(e.exam_date), "dd-MMM-yyyy"),
+      time: e.start_time ? `${e.start_time}${e.end_time ? ` - ${e.end_time}` : ""}` : undefined,
+    })) || [];
+
+    // Sort students alphabetically by name and assign roll numbers
+    const sortedStudents = studentsData
+      .map(student => ({
+        ...student,
+        name: profileMap.get(student.user_id)?.name || "",
+        photo: profileMap.get(student.user_id)?.photo || undefined,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const rollNumberSlipData = sortedStudents.map((student, index) => ({
+      studentName: student.name,
+      studentId: student.student_id,
+      fatherName: fatherNameMap.get(student.id),
+      className: classData?.name || exam.classes?.name || "",
+      section: classData?.section,
+      rollNumber: String(index + 1), // Auto-assign roll number based on alphabetical order
+      examName: exam.name,
+      examDate: format(parseISO(exam.exam_date), "dd-MMM-yyyy"),
+      examTime: exam.start_time ? `${exam.start_time}${exam.end_time ? ` - ${exam.end_time}` : ""}` : undefined,
+      subjects,
+      photoUrl: student.photo,
+    }));
+
+    await downloadClassRollNumberSlips(rollNumberSlipData, classData?.name || exam.classes?.name || "Class");
+    toast({ title: "Downloaded", description: "Roll number slips PDF downloaded successfully" });
+  };
+
   const getExamTypeBadge = (type: string) => {
     const variants: Record<string, "default" | "secondary" | "outline"> = {
       midterm: "default",
@@ -381,6 +490,9 @@ const AdminExams = () => {
                     <TableCell>{exam.start_time && exam.end_time ? `${exam.start_time} - ${exam.end_time}` : "-"}</TableCell>
                     <TableCell>{exam.max_marks} (Pass: {exam.passing_marks})</TableCell>
                     <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => handleDownloadRollNumberSlips(exam)} title="Download Roll Number Slips">
+                        <FileText className="h-4 w-4 text-success" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDownloadAwardList(exam)} title="Download Award List">
                         <Download className="h-4 w-4 text-primary" />
                       </Button>
