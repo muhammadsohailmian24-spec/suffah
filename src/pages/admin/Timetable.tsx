@@ -306,7 +306,7 @@ const AdminTimetable = () => {
                     timeSlots.map(time => (
                       <tr key={time}>
                         <td className="border border-border p-2 text-sm font-medium bg-muted/50 whitespace-nowrap">
-                          {formatTime(time)}
+                          {formatTime(time)} to {formatTime(entries.find(e => e.start_time === time)?.end_time || time)}
                         </td>
                         {[1, 2, 3, 4, 5].map(day => {
                           const slotEntries = getEntriesForSlot(day, time);
