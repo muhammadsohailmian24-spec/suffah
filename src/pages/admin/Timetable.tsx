@@ -167,7 +167,11 @@ const AdminTimetable = () => {
   };
 
   const getEntriesForSlot = (day: number, time: string) => {
-    return entries.filter(e => e.day_of_week === day && e.start_time === time);
+    const slotHour = parseInt(time.split(":")[0]);
+    return entries.filter(e => {
+      const entryHour = parseInt(e.start_time.split(":")[0]);
+      return e.day_of_week === day && entryHour === slotHour;
+    });
   };
 
   if (loading) {
