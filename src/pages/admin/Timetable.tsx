@@ -25,7 +25,6 @@ interface TimetableEntry {
 }
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const TIME_SLOTS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 
 const AdminTimetable = () => {
   const navigate = useNavigate();
@@ -166,15 +165,27 @@ const AdminTimetable = () => {
     fetchTimetable();
   };
 
+  // Get unique time slots from actual entries, sorted
+  const timeSlots = [...new Set(entries.map(e => e.start_time))].sort();
+
   const getEntriesForSlot = (day: number, time: string) => {
-    const slotHour = parseInt(time.split(":")[0]);
-    return entries.filter(e => {
-      const entryHour = parseInt(e.start_time.split(":")[0]);
-      return e.day_of_week === day && entryHour === slotHour;
-    });
+    return entries.filter(e => e.day_of_week === day && e.start_time === time);
+  };
+
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(":");
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
   };
 
   if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -285,36 +296,49 @@ const AdminTimetable = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {TIME_SLOTS.map(time => (
-                    <tr key={time}>
-                      <td className="border border-border p-2 text-sm font-medium bg-muted/50">{time}</td>
-                      {[1, 2, 3, 4, 5].map(day => {
-                        const slotEntries = getEntriesForSlot(day, time);
-                        return (
-                          <td key={day} className="border border-border p-1 min-w-[140px] h-20 align-top">
-                            {slotEntries.map(entry => (
-                              <div 
-                                key={entry.id} 
-                                className="bg-primary/10 border border-primary/20 rounded p-1 mb-1 text-xs group relative"
-                              >
-                                <div className="font-medium text-primary">{entry.subjects?.name}</div>
-                                <div className="text-muted-foreground">{teacherProfiles[entry.teacher_id]}</div>
-                                {entry.room_number && <div className="text-muted-foreground">Room: {entry.room_number}</div>}
-                                <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 flex gap-1 bg-background rounded p-1 shadow">
-                                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => openEditDialog(entry)}>
-                                    <Edit className="h-3 w-3" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleDelete(entry.id)}>
-                                    <Trash2 className="h-3 w-3 text-destructive" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </td>
-                        );
-                      })}
+                  {timeSlots.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="border border-border p-8 text-center text-muted-foreground">
+                        No slots created yet. Click "Add Slot" to create your first timetable entry.
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    timeSlots.map(time => (
+                      <tr key={time}>
+                        <td className="border border-border p-2 text-sm font-medium bg-muted/50 whitespace-nowrap">
+                          {formatTime(time)}
+                        </td>
+                        {[1, 2, 3, 4, 5].map(day => {
+                          const slotEntries = getEntriesForSlot(day, time);
+                          return (
+                            <td key={day} className="border border-border p-1 min-w-[140px] h-20 align-top">
+                              {slotEntries.map(entry => (
+                                <div 
+                                  key={entry.id} 
+                                  className="bg-primary/10 border border-primary/20 rounded p-1 mb-1 text-xs group relative"
+                                >
+                                  <div className="font-medium text-primary">{entry.subjects?.name}</div>
+                                  <div className="text-muted-foreground">{teacherProfiles[entry.teacher_id]}</div>
+                                  <div className="text-muted-foreground text-[10px]">
+                                    {formatTime(entry.start_time)} - {formatTime(entry.end_time)}
+                                  </div>
+                                  {entry.room_number && <div className="text-muted-foreground">Room: {entry.room_number}</div>}
+                                  <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 flex gap-1 bg-background rounded p-1 shadow">
+                                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => openEditDialog(entry)}>
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleDelete(entry.id)}>
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
