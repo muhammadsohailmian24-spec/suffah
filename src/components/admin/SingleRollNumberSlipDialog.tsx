@@ -142,7 +142,7 @@ const SingleRollNumberSlipDialog = ({ examName, open, onOpenChange }: SingleRoll
           : undefined,
       }));
 
-      // Get roll number
+      // Get roll number and student details
       const { data: classStudents, error: classError } = await supabase
         .from("students")
         .select("id, user_id")
@@ -154,19 +154,23 @@ const SingleRollNumberSlipDialog = ({ examName, open, onOpenChange }: SingleRoll
       const studentUserIds = (classStudents || []).map(s => s.user_id);
       const { data: studentProfiles } = await supabase
         .from("profiles")
-        .select("user_id, full_name")
+        .select("user_id, full_name, photo_url")
         .in("user_id", studentUserIds);
 
-      const profilesMap = new Map((studentProfiles || []).map(p => [p.user_id, p.full_name]));
+      const profilesMap = new Map((studentProfiles || []).map(p => [p.user_id, { name: p.full_name, photo: p.photo_url }]));
 
       const sortedStudents = (classStudents || [])
         .map(s => ({
           id: s.id,
-          name: profilesMap.get(s.user_id) || "",
+          name: profilesMap.get(s.user_id)?.name || "",
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
       const rollNumber = sortedStudents.findIndex(s => s.id === student.id) + 1;
+
+      // Get current student's photo
+      const currentStudent = (classStudents || []).find(s => s.id === student.id);
+      const studentPhoto = currentStudent ? profilesMap.get(currentStudent.user_id)?.photo : null;
 
       const slipData: RollNumberSlipData = {
         schoolName: "The Suffah",
@@ -179,6 +183,7 @@ const SingleRollNumberSlipDialog = ({ examName, open, onOpenChange }: SingleRoll
         className: student.class_name,
         fatherName: "",
         subjects: examSubjects,
+        photoUrl: studentPhoto || undefined,
       };
 
       await downloadRollNumberSlip(slipData);

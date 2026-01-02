@@ -56,6 +56,7 @@ export type Database = {
           parent_email: string | null
           parent_name: string
           parent_phone: string
+          photo_url: string | null
           previous_class: string | null
           previous_school: string | null
           review_notes: string | null
@@ -77,6 +78,7 @@ export type Database = {
           parent_email?: string | null
           parent_name: string
           parent_phone: string
+          photo_url?: string | null
           previous_class?: string | null
           previous_school?: string | null
           review_notes?: string | null
@@ -98,6 +100,7 @@ export type Database = {
           parent_email?: string | null
           parent_name?: string
           parent_phone?: string
+          photo_url?: string | null
           previous_class?: string | null
           previous_school?: string | null
           review_notes?: string | null
@@ -592,6 +595,7 @@ export type Database = {
       parents: {
         Row: {
           created_at: string
+          father_cnic: string | null
           id: string
           occupation: string | null
           relationship: string | null
@@ -600,6 +604,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          father_cnic?: string | null
           id?: string
           occupation?: string | null
           relationship?: string | null
@@ -608,6 +613,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          father_cnic?: string | null
           id?: string
           occupation?: string | null
           relationship?: string | null

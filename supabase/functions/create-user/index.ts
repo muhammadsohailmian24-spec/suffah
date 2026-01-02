@@ -72,8 +72,10 @@ serve(async (req) => {
     }
 
     // For students, use student ID-based email format
+    // For parents, use CNIC-based email format
     let userEmail = email;
     let studentId = roleSpecificData?.student_id;
+    let fatherCnic = roleSpecificData?.father_cnic;
     
     if (role === "student") {
       // Generate student ID if not provided
@@ -82,8 +84,19 @@ serve(async (req) => {
       }
       // Create email from student ID (studentid@suffah.local)
       userEmail = `${studentId.toLowerCase()}@suffah.local`;
+    } else if (role === "parent") {
+      // For parents, use CNIC as the login identifier
+      if (!fatherCnic) {
+        return new Response(JSON.stringify({ error: "Father's CNIC is required for parent accounts" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Clean CNIC and use as email format
+      const cleanCnic = fatherCnic.replace(/-/g, "");
+      userEmail = `${cleanCnic}@suffah.local`;
     } else if (!email) {
-      return new Response(JSON.stringify({ error: "Email is required for non-student users" }), {
+      return new Response(JSON.stringify({ error: "Email is required for staff users" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -163,12 +176,14 @@ serve(async (req) => {
         });
       }
     } else if (role === "parent") {
+      const cleanCnic = roleSpecificData?.father_cnic?.replace(/-/g, "") || null;
       const { error: parentError } = await supabaseAdmin
         .from("parents")
         .insert({
           user_id: userId,
           occupation: roleSpecificData?.occupation || null,
-          relationship: roleSpecificData?.relationship || "parent",
+          relationship: roleSpecificData?.relationship || "father",
+          father_cnic: cleanCnic,
         });
 
       if (parentError) {
