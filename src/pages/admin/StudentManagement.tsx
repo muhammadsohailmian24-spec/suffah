@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Pencil, Trash2, UserCheck, UserX, Loader2, KeyRound, Mail, Upload, X } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, UserCheck, UserX, Loader2, KeyRound, Mail, Upload, X, MoreHorizontal } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -569,34 +570,44 @@ const StudentManagement = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => openEditDialog(student)} title="Edit">
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" onClick={() => openResetPasswordDialog(student)} title="Reset Password">
-                          <KeyRound className="w-4 h-4 text-warning" />
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          onClick={() => handleToggleStatus(student)}
-                          title={student.status === "active" ? "Deactivate" : "Activate"}
-                        >
-                          {student.status === "active" ? 
-                            <UserX className="w-4 h-4 text-destructive" /> : 
-                            <UserCheck className="w-4 h-4 text-success" />
-                          }
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="text-destructive"
-                          onClick={() => handleDelete(student.id)}
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-popover">
+                          <DropdownMenuItem onClick={() => openEditDialog(student)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit Student
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openResetPasswordDialog(student)}>
+                            <KeyRound className="w-4 h-4 mr-2" />
+                            Reset Password
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleToggleStatus(student)}>
+                            {student.status === "active" ? (
+                              <>
+                                <UserX className="w-4 h-4 mr-2 text-destructive" />
+                                Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="w-4 h-4 mr-2 text-success" />
+                                Activate
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDelete(student.id)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Student
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
