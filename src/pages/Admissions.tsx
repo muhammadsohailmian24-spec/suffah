@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { GraduationCap, ArrowLeft, CheckCircle, Upload } from "lucide-react";
+import { GraduationCap, ArrowLeft, CheckCircle, Upload, Camera } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,16 +14,18 @@ const Admissions = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
     applicant_name: "",
-    applicant_email: "",
-    applicant_phone: "",
     date_of_birth: "",
     gender: "",
-    parent_name: "",
-    parent_phone: "",
-    parent_email: "",
+    applicant_phone: "",
+    father_name: "",
+    father_phone: "",
+    father_cnic: "",
     address: "",
     applying_for_class: "",
     previous_school: "",
@@ -34,17 +36,99 @@ const Admissions = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Photo must be less than 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadPhoto = async (): Promise<string | null> => {
+    if (!photoFile) return null;
+    
+    const fileExt = photoFile.name.split(".").pop();
+    const fileName = `admission-${Date.now()}.${fileExt}`;
+    const filePath = `admissions/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("student-photos")
+      .upload(filePath, photoFile);
+
+    if (uploadError) {
+      console.error("Photo upload error:", uploadError);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("student-photos")
+      .getPublicUrl(filePath);
+
+    return urlData.publicUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation
+    if (!formData.applicant_name || !formData.father_name || !formData.father_phone || 
+        !formData.father_cnic || !formData.address || !formData.date_of_birth || 
+        !formData.applying_for_class) {
+      toast({
+        title: "Missing required fields",
+        description: "Please fill in all required fields marked with *",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // CNIC validation (13 digits)
+    const cnicClean = formData.father_cnic.replace(/-/g, "");
+    if (!/^\d{13}$/.test(cnicClean)) {
+      toast({
+        title: "Invalid CNIC",
+        description: "Father's CNIC must be 13 digits (e.g., 12345-1234567-1)",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      // Upload photo if provided
+      const photoUrl = await uploadPhoto();
+
       const { error } = await supabase
-        .from("admissions" as any)
+        .from("admissions")
         .insert({
-          ...formData,
+          applicant_name: formData.applicant_name,
+          applicant_email: `pending-${Date.now()}@suffah.local`, // Placeholder email
+          applicant_phone: formData.applicant_phone || formData.father_phone,
+          date_of_birth: formData.date_of_birth,
+          gender: formData.gender || "male",
+          parent_name: formData.father_name,
+          parent_phone: formData.father_phone,
+          parent_email: `${cnicClean}@suffah.local`, // CNIC-based placeholder
+          address: formData.address,
           applying_for_class: parseInt(formData.applying_for_class),
-        } as any);
+          previous_school: formData.previous_school || null,
+          previous_class: formData.previous_class || null,
+          photo_url: photoUrl,
+          documents: { father_cnic: cnicClean },
+        });
 
       if (error) throw error;
 
@@ -81,7 +165,24 @@ const Admissions = () => {
               <Link to="/">
                 <Button variant="outline">Back to Home</Button>
               </Link>
-              <Button onClick={() => setSubmitted(false)} className="hero-gradient text-primary-foreground">
+              <Button onClick={() => {
+                setSubmitted(false);
+                setPhotoPreview(null);
+                setPhotoFile(null);
+                setFormData({
+                  applicant_name: "",
+                  date_of_birth: "",
+                  gender: "",
+                  applicant_phone: "",
+                  father_name: "",
+                  father_phone: "",
+                  father_cnic: "",
+                  address: "",
+                  applying_for_class: "",
+                  previous_school: "",
+                  previous_class: "",
+                });
+              }} className="hero-gradient text-primary-foreground">
                 Submit Another
               </Button>
             </div>
@@ -134,12 +235,44 @@ const Admissions = () => {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-8">
+                {/* Student Photo */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-4 pb-2 border-b">Student Photo</h3>
+                  <div className="flex items-center gap-6">
+                    <div 
+                      className="w-32 h-40 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {photoPreview ? (
+                        <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <>
+                          <Camera className="w-8 h-8 text-muted-foreground mb-2" />
+                          <span className="text-xs text-muted-foreground text-center px-2">Click to upload photo</span>
+                        </>
+                      )}
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      className="hidden"
+                    />
+                    <div className="text-sm text-muted-foreground">
+                      <p>Upload a passport-size photo</p>
+                      <p>Max size: 5MB</p>
+                      <p>Formats: JPG, PNG</p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Student Information */}
                 <div>
                   <h3 className="font-semibold text-lg mb-4 pb-2 border-b">Student Information</h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="applicant_name">Full Name *</Label>
+                      <Label htmlFor="applicant_name">Student Full Name *</Label>
                       <Input
                         id="applicant_name"
                         placeholder="Student's full name"
@@ -167,7 +300,6 @@ const Admissions = () => {
                         <SelectContent>
                           <SelectItem value="male">Male</SelectItem>
                           <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -186,63 +318,54 @@ const Admissions = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="applicant_email">Email *</Label>
-                      <Input
-                        id="applicant_email"
-                        type="email"
-                        placeholder="student@example.com"
-                        value={formData.applicant_email}
-                        onChange={(e) => handleChange("applicant_email", e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="applicant_phone">Phone *</Label>
+                    <div className="md:col-span-2 space-y-2">
+                      <Label htmlFor="applicant_phone">Student Phone (Optional)</Label>
                       <Input
                         id="applicant_phone"
                         placeholder="+92 300 1234567"
                         value={formData.applicant_phone}
                         onChange={(e) => handleChange("applicant_phone", e.target.value)}
-                        required
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Parent/Guardian Information */}
+                {/* Father/Guardian Information */}
                 <div>
-                  <h3 className="font-semibold text-lg mb-4 pb-2 border-b">Parent/Guardian Information</h3>
+                  <h3 className="font-semibold text-lg mb-4 pb-2 border-b">Father/Guardian Information</h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="parent_name">Parent/Guardian Name *</Label>
+                      <Label htmlFor="father_name">Father's Name *</Label>
                       <Input
-                        id="parent_name"
-                        placeholder="Full name"
-                        value={formData.parent_name}
-                        onChange={(e) => handleChange("parent_name", e.target.value)}
+                        id="father_name"
+                        placeholder="Father's full name"
+                        value={formData.father_name}
+                        onChange={(e) => handleChange("father_name", e.target.value)}
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="parent_phone">Parent Phone *</Label>
+                      <Label htmlFor="father_phone">Father's Phone *</Label>
                       <Input
-                        id="parent_phone"
+                        id="father_phone"
                         placeholder="+92 300 1234567"
-                        value={formData.parent_phone}
-                        onChange={(e) => handleChange("parent_phone", e.target.value)}
+                        value={formData.father_phone}
+                        onChange={(e) => handleChange("father_phone", e.target.value)}
                         required
                       />
                     </div>
                     <div className="md:col-span-2 space-y-2">
-                      <Label htmlFor="parent_email">Parent Email</Label>
+                      <Label htmlFor="father_cnic">Father's CNIC *</Label>
                       <Input
-                        id="parent_email"
-                        type="email"
-                        placeholder="parent@example.com"
-                        value={formData.parent_email}
-                        onChange={(e) => handleChange("parent_email", e.target.value)}
+                        id="father_cnic"
+                        placeholder="12345-1234567-1"
+                        value={formData.father_cnic}
+                        onChange={(e) => handleChange("father_cnic", e.target.value)}
+                        required
                       />
+                      <p className="text-xs text-muted-foreground">
+                        This will be used as the parent login username after admission approval
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -289,10 +412,9 @@ const Admissions = () => {
                   <div className="flex items-start gap-3">
                     <Upload className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <p className="font-medium">Required Documents</p>
+                      <p className="font-medium">Required Documents (Bring at the time of admission)</p>
                       <p className="text-sm text-muted-foreground">
-                        After submitting this form, you'll need to provide: Birth certificate, 
-                        Previous school records, Passport-size photos (2), and Parent's CNIC copy.
+                        Birth certificate, Previous school records, Passport-size photos (2), and Father's CNIC copy.
                       </p>
                     </div>
                   </div>

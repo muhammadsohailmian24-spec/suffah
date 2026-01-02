@@ -219,9 +219,29 @@ export const generateClassRollNumberSlips = async (students: RollNumberSlipData[
     combinedDoc.setDrawColor(...grayColor);
     combinedDoc.setLineWidth(0.5);
     combinedDoc.rect(photoX, photoY, photoWidth, photoHeight);
-    combinedDoc.setFontSize(8);
-    combinedDoc.setTextColor(...grayColor);
-    combinedDoc.text("Photo", photoX + photoWidth / 2, photoY + photoHeight / 2, { align: "center" });
+
+    if (data.photoUrl) {
+      try {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => {
+            combinedDoc.addImage(img, "JPEG", photoX, photoY, photoWidth, photoHeight);
+            resolve();
+          };
+          img.onerror = reject;
+          img.src = data.photoUrl!;
+        });
+      } catch (e) {
+        combinedDoc.setFontSize(8);
+        combinedDoc.setTextColor(...grayColor);
+        combinedDoc.text("Photo", photoX + photoWidth / 2, photoY + photoHeight / 2, { align: "center" });
+      }
+    } else {
+      combinedDoc.setFontSize(8);
+      combinedDoc.setTextColor(...grayColor);
+      combinedDoc.text("Photo", photoX + photoWidth / 2, photoY + photoHeight / 2, { align: "center" });
+    }
 
     // Student details
     let yPos = 50;

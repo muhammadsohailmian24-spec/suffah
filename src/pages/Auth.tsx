@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraduationCap, Mail, Lock, ArrowLeft, User, IdCard } from "lucide-react";
-import { Link } from "react-router-dom";
+import { GraduationCap, Lock, ArrowLeft, IdCard, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -15,26 +14,22 @@ const Auth = () => {
   const { toast } = useToast();
   
   const [isLoading, setIsLoading] = useState(false);
-  // Staff/Admin login
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   // Student login
   const [studentId, setStudentId] = useState("");
   const [studentPassword, setStudentPassword] = useState("");
+  // Parent login
+  const [parentCnic, setParentCnic] = useState("");
+  const [parentPassword, setParentPassword] = useState("");
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Only redirect on SIGNED_IN event, not on initial load
       if (event === 'SIGNED_IN' && session) {
         navigate("/dashboard");
       }
     });
 
-    // Then check for existing session - but only if not coming from logout
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      // Only redirect if there's an active session
       if (session) {
         navigate("/dashboard");
       }
@@ -44,39 +39,11 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleStaffSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully signed in.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Sign in failed",
-        description: error.message || "Please check your credentials and try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleStudentSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Convert student ID to email format (studentid@suffah.local)
       const studentEmail = `${studentId.toLowerCase().trim()}@suffah.local`;
       
       const { error } = await supabase.auth.signInWithPassword({
@@ -94,6 +61,37 @@ const Auth = () => {
       toast({
         title: "Sign in failed",
         description: "Invalid Student ID or password. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleParentSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      // Clean CNIC (remove dashes) and convert to email format
+      const cleanCnic = parentCnic.replace(/-/g, "").trim();
+      const parentEmail = `${cleanCnic}@suffah.local`;
+      
+      const { error } = await supabase.auth.signInWithPassword({
+        email: parentEmail,
+        password: parentPassword,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully signed in.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Sign in failed",
+        description: "Invalid CNIC or password. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -120,8 +118,8 @@ const Auth = () => {
             The Suffah<br />Public School & College
           </h1>
           <p className="text-primary-foreground/80 text-lg max-w-md">
-            Access your personalized portal for academic excellence. Manage classes, 
-            track progress, and connect with your educational community.
+            Access your personalized portal for academic excellence. Track your 
+            progress, attendance, and connect with your educational community.
           </p>
         </div>
         
@@ -155,9 +153,9 @@ const Auth = () => {
                     <GraduationCap className="w-4 h-4" />
                     Student
                   </TabsTrigger>
-                  <TabsTrigger value="staff" className="gap-2">
-                    <User className="w-4 h-4" />
-                    Staff
+                  <TabsTrigger value="parent" className="gap-2">
+                    <Users className="w-4 h-4" />
+                    Parent
                   </TabsTrigger>
                 </TabsList>
                 
@@ -201,50 +199,56 @@ const Auth = () => {
                   </form>
                 </TabsContent>
                 
-                {/* Staff Login Tab */}
-                <TabsContent value="staff">
-                  <form onSubmit={handleStaffSignIn} className="space-y-4">
+                {/* Parent Login Tab */}
+                <TabsContent value="parent">
+                  <form onSubmit={handleParentSignIn} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="signin-email">Email</Label>
+                      <Label htmlFor="parent-cnic">Father's CNIC</Label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
-                          id="signin-email"
-                          type="email"
-                          placeholder="you@example.com"
+                          id="parent-cnic"
+                          type="text"
+                          placeholder="12345-1234567-1"
                           className="pl-10"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
+                          value={parentCnic}
+                          onChange={(e) => setParentCnic(e.target.value)}
                           required
                         />
                       </div>
+                      <p className="text-xs text-muted-foreground">Enter your CNIC number (with or without dashes)</p>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="signin-password">Password</Label>
+                      <Label htmlFor="parent-password">Password</Label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
-                          id="signin-password"
+                          id="parent-password"
                           type="password"
                           placeholder="••••••••"
                           className="pl-10"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
+                          value={parentPassword}
+                          onChange={(e) => setParentPassword(e.target.value)}
                           required
                         />
                       </div>
                     </div>
                     <Button type="submit" className="w-full hero-gradient text-primary-foreground" disabled={isLoading}>
-                      {isLoading ? "Signing in..." : "Sign In as Staff"}
+                      {isLoading ? "Signing in..." : "Sign In as Parent"}
                     </Button>
                   </form>
                 </TabsContent>
               </Tabs>
               
-              <div className="mt-6 pt-6 border-t text-center">
-                <p className="text-sm text-muted-foreground">
+              <div className="mt-6 pt-6 border-t space-y-3">
+                <p className="text-sm text-muted-foreground text-center">
                   Don't have an account? Contact your school administrator to get your login credentials.
                 </p>
+                <div className="text-center">
+                  <Link to="/staff-login" className="text-sm text-primary hover:underline">
+                    Staff / Admin Login →
+                  </Link>
+                </div>
               </div>
             </CardContent>
           </Card>
