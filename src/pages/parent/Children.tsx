@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, User, GraduationCap, BookOpen, Calendar, Wallet } from "lucide-react";
+import { ArrowLeft, User, GraduationCap, BookOpen, Calendar, Wallet, Settings, Bell, Megaphone } from "lucide-react";
 
 interface Child {
   id: string;
@@ -119,93 +119,114 @@ const ParentChildren = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">My Children</h1>
-            <p className="text-muted-foreground">View and manage your children's information</p>
-          </div>
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar */}
+      <aside className="hidden lg:block w-64 min-h-screen border-r border-border bg-card">
+        <div className="p-4">
+          <h2 className="text-lg font-bold mb-4">Parent Portal</h2>
+          <nav className="space-y-2">
+            <Link to="/parent/children" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary text-primary-foreground"><User className="w-5 h-5" />My Children</Link>
+            <Link to="/parent/announcements" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><Megaphone className="w-5 h-5" />Announcements</Link>
+            <Link to="/parent/notifications" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><Bell className="w-5 h-5" />Notifications</Link>
+            <Link to="/parent/settings" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><Settings className="w-5 h-5" />Settings</Link>
+          </nav>
         </div>
-      </header>
+      </aside>
 
-      <main className="p-6">
-        {children.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Children Linked</h3>
-              <p className="text-muted-foreground">
-                Contact the school administration to link your children to your account.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {children.map((child) => (
-              <Card key={child.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-16 w-16">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xl">
-                        {child.profiles?.full_name?.charAt(0) || "S"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <CardTitle className="text-lg">{child.profiles?.full_name || "Unknown"}</CardTitle>
-                      <p className="text-sm text-muted-foreground">ID: {child.student_id}</p>
-                      <Badge variant={child.status === "active" ? "default" : "secondary"} className="mt-1">
-                        {child.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-3 text-sm">
-                    <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      {child.classes ? `${child.classes.name} ${child.classes.section || ""}` : "Not assigned"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <BookOpen className="h-4 w-4 text-muted-foreground" />
-                    <span>Grade {child.classes?.grade_level || "N/A"}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 pt-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => navigate(`/parent/attendance/${child.id}`)}
-                    >
-                      <Calendar className="h-4 w-4 mr-1" />
-                      Attendance
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => navigate(`/parent/results/${child.id}`)}
-                    >
-                      <BookOpen className="h-4 w-4 mr-1" />
-                      Results
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => navigate(`/parent/fees/${child.id}`)}
-                    >
-                      <Wallet className="h-4 w-4 mr-1" />
-                      Fees
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      <div className="flex-1">
+        <header className="bg-card border-b border-border px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="lg:hidden">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">My Children</h1>
+                <p className="text-muted-foreground">View and manage your children's information</p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate("/parent/settings")} className="lg:hidden">
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
           </div>
-        )}
-      </main>
+        </header>
+
+        <main className="p-6">
+          {children.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Children Linked</h3>
+                <p className="text-muted-foreground">
+                  Contact the school administration to link your children to your account.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {children.map((child) => (
+                <Card key={child.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-16 w-16">
+                        <AvatarFallback className="bg-primary/10 text-primary text-xl">
+                          {child.profiles?.full_name?.charAt(0) || "S"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <CardTitle className="text-lg">{child.profiles?.full_name || "Unknown"}</CardTitle>
+                        <p className="text-sm text-muted-foreground">ID: {child.student_id}</p>
+                        <Badge variant={child.status === "active" ? "default" : "secondary"} className="mt-1">
+                          {child.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3 text-sm">
+                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                      <span>
+                        {child.classes ? `${child.classes.name} ${child.classes.section || ""}` : "Not assigned"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <BookOpen className="h-4 w-4 text-muted-foreground" />
+                      <span>Grade {child.classes?.grade_level || "N/A"}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate(`/parent/attendance/${child.id}`)}
+                      >
+                        <Calendar className="h-4 w-4 mr-1" />
+                        Attendance
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate(`/parent/results/${child.id}`)}
+                      >
+                        <BookOpen className="h-4 w-4 mr-1" />
+                        Results
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate(`/parent/fees/${child.id}`)}
+                      >
+                        <Wallet className="h-4 w-4 mr-1" />
+                        Fees
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 };
