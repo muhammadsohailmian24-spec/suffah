@@ -321,9 +321,12 @@ const Dashboard = () => {
     
     if (userRole === "parent") {
       baseLinks.push({ icon: Settings, label: "Notification Preferences", link: "/parent/notifications", active: false });
+      baseLinks.push({ icon: Settings, label: "Settings", link: "/parent/settings", active: false });
+    } else if (userRole === "student") {
+      baseLinks.push({ icon: Settings, label: "Settings", link: "/student/settings", active: false });
+    } else {
+      baseLinks.push({ icon: Settings, label: "Settings", link: "/settings", active: false });
     }
-    
-    baseLinks.push({ icon: Settings, label: "Settings", link: "/settings", active: false });
     
     return baseLinks;
   };

@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Award, TrendingUp, BookOpen } from "lucide-react";
+import { ArrowLeft, Award, TrendingUp, BookOpen, Download, Loader2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { downloadMarksCertificate } from "@/utils/generateMarksCertificatePdf";
+import { useToast } from "@/hooks/use-toast";
 
 interface Result {
   id: string;
@@ -28,9 +30,12 @@ interface Result {
 const ParentResults = () => {
   const navigate = useNavigate();
   const { studentId } = useParams();
+  const { toast } = useToast();
   const [results, setResults] = useState<Result[]>([]);
   const [studentName, setStudentName] = useState("");
+  const [studentData, setStudentData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [downloadingDmc, setDownloadingDmc] = useState(false);
 
   useEffect(() => {
     if (studentId) {
@@ -42,18 +47,33 @@ const ParentResults = () => {
   const fetchStudentName = async () => {
     const { data: student } = await supabase
       .from("students")
-      .select("user_id")
+      .select("user_id, student_id, class_id")
       .eq("id", studentId)
       .single();
 
     if (student) {
+      setStudentData(student);
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name")
+        .select("full_name, date_of_birth, photo_url")
         .eq("user_id", student.user_id)
         .single();
       
-      if (profile) setStudentName(profile.full_name);
+      if (profile) {
+        setStudentName(profile.full_name);
+        setStudentData((prev: any) => ({ ...prev, ...profile }));
+      }
+
+      if (student.class_id) {
+        const { data: classData } = await supabase
+          .from("classes")
+          .select("name, section, grade_level")
+          .eq("id", student.class_id)
+          .single();
+        if (classData) {
+          setStudentData((prev: any) => ({ ...prev, class: classData }));
+        }
+      }
     }
   };
 
@@ -118,6 +138,43 @@ const ParentResults = () => {
     acc[type].push(result);
     return acc;
   }, {} as Record<string, Result[]>);
+
+  const handleDownloadDmc = async (examType: string) => {
+    setDownloadingDmc(true);
+    try {
+      const examResults = groupedResults[examType] || [];
+      if (examResults.length === 0) {
+        toast({ title: "No results", description: "No results found for this exam type", variant: "destructive" });
+        return;
+      }
+
+      const subjects = examResults.map(r => ({
+        name: r.exams?.subjects?.name || "Unknown",
+        maxMarks: r.exams?.max_marks || 100,
+        marksObtained: r.marks_obtained,
+        grade: r.grade || undefined,
+      }));
+
+      await downloadMarksCertificate({
+        studentName: studentName,
+        studentId: studentData?.student_id || "",
+        className: studentData?.class?.name || "",
+        section: studentData?.class?.section || undefined,
+        session: new Date().getFullYear().toString(),
+        dateOfBirth: studentData?.date_of_birth || undefined,
+        examName: examType,
+        subjects,
+        photoUrl: studentData?.photo_url || undefined,
+      });
+
+      toast({ title: "Success", description: "DMC downloaded successfully" });
+    } catch (error) {
+      console.error("Error downloading DMC:", error);
+      toast({ title: "Error", description: "Failed to download DMC", variant: "destructive" });
+    } finally {
+      setDownloadingDmc(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -198,11 +255,24 @@ const ParentResults = () => {
             {/* Results by Exam Type */}
             {Object.entries(groupedResults).map(([examType, typeResults]) => (
               <Card key={examType}>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <Award className="h-5 w-5" />
                     {examType} Examinations
                   </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadDmc(examType)}
+                    disabled={downloadingDmc}
+                  >
+                    {downloadingDmc ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    Download DMC
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
