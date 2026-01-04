@@ -324,9 +324,10 @@ const Dashboard = () => {
       baseLinks.push({ icon: Settings, label: "Settings", link: "/parent/settings", active: false });
     } else if (userRole === "student") {
       baseLinks.push({ icon: Settings, label: "Settings", link: "/student/settings", active: false });
-    } else {
-      baseLinks.push({ icon: Settings, label: "Settings", link: "/settings", active: false });
+    } else if (userRole === "admin") {
+      baseLinks.push({ icon: Settings, label: "Settings", link: "/admin/settings", active: false });
     }
+    // Note: Teachers don't have a dedicated settings page yet
     
     return baseLinks;
   };
