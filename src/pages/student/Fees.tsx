@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  GraduationCap, LogOut, Receipt, Wallet, AlertCircle, CheckCircle2, Clock, Download 
+  LogOut, Receipt, Wallet, AlertCircle, CheckCircle2, Clock, Download 
 } from "lucide-react";
+import PortalHeader from "@/components/PortalHeader";
 import { downloadInvoice } from "@/utils/generateInvoicePdf";
 import { toast } from "sonner";
 
@@ -231,22 +232,7 @@ const StudentFees = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 glass border-b border-border/50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg hero-gradient flex items-center justify-center">
-              <GraduationCap className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="font-heading text-lg font-bold">The Suffah</h1>
-              <p className="text-xs text-muted-foreground">Student Portal</p>
-            </div>
-          </Link>
-          <Button variant="ghost" size="icon" onClick={handleSignOut}>
-            <LogOut className="h-5 w-5" />
-          </Button>
-        </div>
-      </header>
+      <PortalHeader portalName="Student Portal" onSignOut={handleSignOut} />
 
       <main className="container mx-auto p-6 space-y-6">
         <div>
