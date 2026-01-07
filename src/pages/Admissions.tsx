@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { GraduationCap, ArrowLeft, CheckCircle, Upload, Camera } from "lucide-react";
+import { ArrowLeft, CheckCircle, Upload, Camera } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -199,9 +199,11 @@ const Admissions = () => {
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg hero-gradient flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-primary-foreground" />
-              </div>
+              <img 
+                src="/images/school-logo.jpg" 
+                alt="The Suffah Public School & College" 
+                className="w-10 h-10 rounded-full object-cover shadow-md"
+              />
               <div>
                 <h1 className="font-heading text-lg font-bold">The Suffah</h1>
                 <p className="text-xs text-muted-foreground">Public School & College</p>

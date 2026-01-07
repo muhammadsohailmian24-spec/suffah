@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
-  GraduationCap, Bell, LogOut, BookOpen, FileText, Award, Calendar, TrendingUp, Download, ClipboardList
+  Bell, LogOut, BookOpen, FileText, Award, Calendar, TrendingUp, Download, ClipboardList
 } from "lucide-react";
+import PortalHeader from "@/components/PortalHeader";
+import PortalSidebarLink from "@/components/PortalSidebarLink";
 import { format, parseISO } from "date-fns";
 import { downloadMarksCertificate } from "@/utils/generateMarksCertificatePdf";
 import { useToast } from "@/hooks/use-toast";
@@ -213,30 +215,17 @@ const StudentResults = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 glass border-b border-border/50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg hero-gradient flex items-center justify-center">
-              <GraduationCap className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div><h1 className="font-heading text-lg font-bold">The Suffah</h1><p className="text-xs text-muted-foreground">Student Portal</p></div>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon"><Bell className="w-5 h-5" /></Button>
-            <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2"><LogOut className="w-4 h-4" />Sign Out</Button>
-          </div>
-        </div>
-      </header>
+      <PortalHeader portalName="Student Portal" onSignOut={handleSignOut} />
 
       <div className="flex">
         <aside className="hidden lg:block w-64 min-h-[calc(100vh-73px)] border-r border-border bg-card">
           <nav className="p-4 space-y-2">
-            <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><GraduationCap className="w-5 h-5" />Dashboard</Link>
-            <Link to="/student/courses" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><BookOpen className="w-5 h-5" />My Courses</Link>
-            <Link to="/student/assignments" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><FileText className="w-5 h-5" />Assignments</Link>
-            <Link to="/student/exams" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><ClipboardList className="w-5 h-5" />Exams</Link>
-            <Link to="/student/results" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary text-primary-foreground"><Award className="w-5 h-5" />Results</Link>
-            <Link to="/student/timetable" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-muted-foreground"><Calendar className="w-5 h-5" />Timetable</Link>
+            <PortalSidebarLink to="/dashboard" icon={BookOpen} label="Dashboard" isDashboard />
+            <PortalSidebarLink to="/student/courses" icon={BookOpen} label="My Courses" />
+            <PortalSidebarLink to="/student/assignments" icon={FileText} label="Assignments" />
+            <PortalSidebarLink to="/student/exams" icon={ClipboardList} label="Exams" />
+            <PortalSidebarLink to="/student/results" icon={Award} label="Results" isActive />
+            <PortalSidebarLink to="/student/timetable" icon={Calendar} label="Timetable" />
           </nav>
         </aside>
 
