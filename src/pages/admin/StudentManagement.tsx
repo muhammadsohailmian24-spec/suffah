@@ -179,10 +179,16 @@ const StudentManagement = () => {
     }
   };
 
-  const generateStudentId = () => {
-    const year = new Date().getFullYear();
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `STU${year}${random}`;
+  const getNextStudentId = (lastId: string | null): string => {
+    if (!lastId) return "";
+    // Extract numeric part from the end of the ID
+    const match = lastId.match(/(\d+)$/);
+    if (match) {
+      const numPart = parseInt(match[1], 10);
+      const prefix = lastId.slice(0, lastId.length - match[1].length);
+      return prefix + (numPart + 1).toString().padStart(match[1].length, '0');
+    }
+    return "";
   };
 
   const uploadPhoto = async (file: File, studentId: string): Promise<string | null> => {
@@ -464,7 +470,7 @@ const StudentManagement = () => {
       full_name: "",
       email: "",
       phone: "",
-      student_id: generateStudentId(),
+      student_id: "",
       class_id: "",
       status: "active",
     });
@@ -784,12 +790,25 @@ const StudentManagement = () => {
                 <Input
                   value={addFormData.student_id}
                   onChange={(e) => setAddFormData(p => ({ ...p, student_id: e.target.value.toUpperCase() }))}
-                  placeholder="e.g., STU2025001"
+                  placeholder="e.g., 101"
                   required
                 />
-                {lastStudentId && (
-                  <p className="text-xs text-primary font-medium">Last used ID: {lastStudentId}</p>
-                )}
+                <div className="flex items-center justify-between">
+                  {lastStudentId && (
+                    <p className="text-xs text-muted-foreground">Last used: <span className="font-semibold text-primary">{lastStudentId}</span></p>
+                  )}
+                  {lastStudentId && (
+                    <Button 
+                      type="button" 
+                      variant="link" 
+                      size="sm" 
+                      className="text-xs h-auto p-0"
+                      onClick={() => setAddFormData(p => ({ ...p, student_id: getNextStudentId(lastStudentId) }))}
+                    >
+                      Use next: {getNextStudentId(lastStudentId)}
+                    </Button>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground">Used for login</p>
               </div>
               <div className="space-y-2">
