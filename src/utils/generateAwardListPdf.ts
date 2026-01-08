@@ -39,14 +39,14 @@ export const generateAwardListPdf = async (data: AwardListData): Promise<jsPDF> 
   } catch (error) {
     // Try to load and add logo if header fails
     try {
-      const logoImg = await loadImage('/images/school-logo.jpg');
-      doc.addImage(logoImg, 'JPEG', margin, 5, 20, 25);
+      const logoImg = await loadImage('/images/school-logo.png');
+      doc.addImage(logoImg, 'PNG', margin, 5, 22, 22);
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('The Suffah Public School & College', margin + 25, 15);
+      doc.text('The Suffah Public School & College', margin + 27, 15);
       doc.setFontSize(10);
-      doc.text('PSRA Reg. No. 200445000302 | BISE Reg. No. 434-B/Swat-C', margin + 25, 22);
-      doc.text('Madyan Swat, Pakistan', margin + 25, 28);
+      doc.text('PSRA Reg. No. 200445000302 | BISE Reg. No. 434-B/Swat-C', margin + 27, 22);
+      doc.text('Madyan Swat, Pakistan', margin + 27, 28);
     } catch {
       // Fallback text header if both images fail
       doc.setFontSize(18);

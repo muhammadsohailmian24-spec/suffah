@@ -34,17 +34,17 @@ export const generateRollNumberSlipPdf = async (data: RollNumberSlipData) => {
   doc.setFillColor(...primaryColor);
   doc.rect(0, 0, pageWidth, 40, "F");
 
-  // Add logo
+  // Add logo (square aspect ratio)
   try {
     const logoImg = new Image();
     logoImg.crossOrigin = "anonymous";
     await new Promise<void>((resolve, reject) => {
       logoImg.onload = () => {
-        doc.addImage(logoImg, "JPEG", 15, 5, 25, 30);
+        doc.addImage(logoImg, "PNG", 10, 5, 30, 30);
         resolve();
       };
       logoImg.onerror = reject;
-      logoImg.src = "/images/school-logo.jpg";
+      logoImg.src = "/images/school-logo.png";
     });
   } catch (e) {
     // Continue without logo if it fails
@@ -214,17 +214,17 @@ export const generateClassRollNumberSlips = async (students: RollNumberSlipData[
     combinedDoc.setFillColor(...primaryColor);
     combinedDoc.rect(0, 0, pageWidth, 40, "F");
 
-    // Add logo
+    // Add logo (square aspect ratio)
     try {
       const logoImg = new Image();
       logoImg.crossOrigin = "anonymous";
       await new Promise<void>((resolve, reject) => {
         logoImg.onload = () => {
-          combinedDoc.addImage(logoImg, "JPEG", 15, 5, 25, 30);
+          combinedDoc.addImage(logoImg, "PNG", 10, 5, 30, 30);
           resolve();
         };
         logoImg.onerror = reject;
-        logoImg.src = "/images/school-logo.jpg";
+        logoImg.src = "/images/school-logo.png";
       });
     } catch (e) {
       // Continue without logo if it fails
