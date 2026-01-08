@@ -236,20 +236,35 @@
     @apply w-full;
   }
 
-  /* Navigation Link Style - Matching Topbar */
+  /* Navigation Link Style - Matching Topbar with foggy glow */
   .nav-link-topbar {
-    @apply px-4 py-2 font-medium text-sm rounded-md cursor-pointer;
-    background: hsl(var(--gold-500));
+    @apply px-4 py-2 font-medium text-sm rounded-md cursor-pointer relative overflow-hidden;
+    background: rgba(255, 255, 255, 0.1);
     color: white;
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     transition: all 0.3s ease;
-    box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+  }
+
+  .nav-link-topbar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
   }
 
   .nav-link-topbar:hover {
-    background: hsl(var(--gold-600));
-    box-shadow: 0 0 25px rgba(212, 175, 55, 0.5);
+    background: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.2), inset 0 0 15px rgba(255, 255, 255, 0.1);
     transform: translateY(-1px);
+  }
+
+  .nav-link-topbar:hover::before {
+    opacity: 1;
   }
 
   .nav-link-topbar:active {

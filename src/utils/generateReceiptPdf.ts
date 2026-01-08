@@ -34,17 +34,17 @@ export const generateReceiptPdf = async (data: ReceiptData) => {
   doc.setFillColor(...primaryColor);
   doc.rect(0, 0, pageWidth, 50, "F");
   
-  // Add logo
+  // Add logo (square aspect ratio)
   try {
     const logoImg = new Image();
     logoImg.crossOrigin = "anonymous";
     await new Promise<void>((resolve, reject) => {
       logoImg.onload = () => {
-        doc.addImage(logoImg, "JPEG", 15, 8, 28, 34);
+        doc.addImage(logoImg, "PNG", 10, 8, 34, 34);
         resolve();
       };
       logoImg.onerror = reject;
-      logoImg.src = "/images/school-logo.jpg";
+      logoImg.src = "/images/school-logo.png";
     });
   } catch (e) {
     // Continue without logo if it fails

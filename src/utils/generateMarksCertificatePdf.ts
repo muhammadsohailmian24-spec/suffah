@@ -102,17 +102,17 @@ export const generateMarksCertificatePdf = async (data: MarksCertificateData) =>
     }
   }
 
-  // Add logo
+  // Add logo (square aspect ratio)
   try {
     const logoImg = new Image();
     logoImg.crossOrigin = "anonymous";
     await new Promise<void>((resolve, reject) => {
       logoImg.onload = () => {
-        doc.addImage(logoImg, "JPEG", leftMargin, 8, 22, 28);
+        doc.addImage(logoImg, "PNG", leftMargin, 8, 25, 25);
         resolve();
       };
       logoImg.onerror = reject;
-      logoImg.src = "/images/school-logo.jpg";
+      logoImg.src = "/images/school-logo.png";
     });
   } catch (e) {
     // Continue without logo if it fails
