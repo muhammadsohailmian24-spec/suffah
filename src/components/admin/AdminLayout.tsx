@@ -1,12 +1,18 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
   LayoutDashboard, Users, School, BookOpen, 
   ClipboardList, Bell, LogOut, Settings, UserCheck, UserPlus,
   Shield, Megaphone, BarChart3, CreditCard, TrendingUp, Image, Clock, FileText,
-  Menu, X, ChevronLeft
+  Menu, X, ChevronLeft, AlertCircle, UserX, FileCheck
 } from "lucide-react";
 
 interface AdminLayoutProps {
@@ -34,11 +40,59 @@ const sidebarItems = [
   { icon: Settings, label: "Settings", link: "/admin/settings" },
 ];
 
+interface Notification {
+  id: string;
+  title: string;
+  icon: typeof AlertCircle;
+  color: string;
+  link: string;
+}
+
 const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    const [admissionsRes, attendanceRes] = await Promise.all([
+      supabase.from("admissions").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("attendance").select("status").eq("date", today).eq("status", "absent"),
+    ]);
+
+    const newNotifications: Notification[] = [];
+    
+    if (admissionsRes.count && admissionsRes.count > 0) {
+      newNotifications.push({
+        id: "pending-admissions",
+        title: `${admissionsRes.count} pending admission(s)`,
+        icon: FileCheck,
+        color: "text-warning",
+        link: "/admin/admissions"
+      });
+    }
+
+    const absentCount = attendanceRes.data?.length || 0;
+    if (absentCount > 0) {
+      newNotifications.push({
+        id: "absent-students",
+        title: `${absentCount} student(s) absent today`,
+        icon: UserX,
+        color: "text-destructive",
+        link: "/admin/attendance"
+      });
+    }
+
+    setNotifications(newNotifications);
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -80,12 +134,49 @@ const AdminLayout = ({ children, title, description }: AdminLayoutProps) => {
             </Link>
           </div>
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="relative nav-btn-hover">
-              <Bell className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
-                3
-              </span>
-            </Button>
+            <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative nav-btn-hover">
+                  <Bell className="w-5 h-5" />
+                  {notifications.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+                      {notifications.length}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <div className="p-4 border-b border-border">
+                  <h4 className="font-semibold">Notifications</h4>
+                  <p className="text-xs text-muted-foreground">
+                    {notifications.length > 0 ? `${notifications.length} item(s) need attention` : "No new notifications"}
+                  </p>
+                </div>
+                <ScrollArea className="max-h-64">
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                      All caught up! No pending notifications.
+                    </div>
+                  ) : (
+                    <div className="p-2 space-y-1">
+                      {notifications.map((notification) => (
+                        <button
+                          key={notification.id}
+                          onClick={() => {
+                            setNotificationOpen(false);
+                            navigate(notification.link);
+                          }}
+                          className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent text-left transition-colors"
+                        >
+                          <notification.icon className={`w-5 h-5 flex-shrink-0 ${notification.color}`} />
+                          <span className="text-sm">{notification.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
             <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2 nav-btn-hover">
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Sign Out</span>

@@ -105,20 +105,88 @@ const AdminDashboard = () => {
     { icon: CheckCircle, label: "Present Today", value: stats.todayPresent, color: "text-success", bgColor: "bg-success/10", trend: "Students" },
   ];
 
-  const recentActivities: Activity[] = [
-    { id: "1", title: "New admission application received", time: "5 minutes ago", type: "info" },
-    { id: "2", title: "Teacher John marked attendance for Class 10A", time: "15 minutes ago", type: "success" },
-    { id: "3", title: "Results published for Mid-term Exams", time: "1 hour ago", type: "success" },
-    { id: "4", title: "Parent meeting scheduled for next week", time: "2 hours ago", type: "warning" },
-    { id: "5", title: `${stats.todayAbsent} students marked absent today`, time: "3 hours ago", type: "error" },
-  ];
+  // Generate real-time activities based on actual data
+  const recentActivities: Activity[] = [];
+  
+  if (stats.pendingAdmissions > 0) {
+    recentActivities.push({ 
+      id: "pending", 
+      title: `${stats.pendingAdmissions} pending admission application(s)`, 
+      time: "Requires attention", 
+      type: "info" 
+    });
+  }
+  
+  if (stats.todayPresent > 0) {
+    recentActivities.push({ 
+      id: "present", 
+      title: `${stats.todayPresent} students marked present today`, 
+      time: "Today", 
+      type: "success" 
+    });
+  }
+  
+  if (stats.todayAbsent > 0) {
+    recentActivities.push({ 
+      id: "absent", 
+      title: `${stats.todayAbsent} students marked absent today`, 
+      time: "Today", 
+      type: "error" 
+    });
+  }
+  
+  if (stats.todayLate > 0) {
+    recentActivities.push({ 
+      id: "late", 
+      title: `${stats.todayLate} students marked late today`, 
+      time: "Today", 
+      type: "warning" 
+    });
+  }
+  
+  if (recentActivities.length === 0) {
+    recentActivities.push({ 
+      id: "no-activity", 
+      title: "No recent activity to display", 
+      time: "Check back later", 
+      type: "info" 
+    });
+  }
 
-  const notifications = [
-    { id: "1", title: "System backup completed", priority: "low" },
-    { id: "2", title: "New teacher registration pending approval", priority: "high" },
-    { id: "3", title: "Academic year setup reminder", priority: "normal" },
-    { id: "4", title: "Fee collection due date approaching", priority: "high" },
-  ];
+  // Generate notifications based on actual data
+  const notifications = [];
+  
+  if (stats.pendingAdmissions > 0) {
+    notifications.push({ 
+      id: "admission", 
+      title: `${stats.pendingAdmissions} admission application(s) pending review`, 
+      priority: "high" 
+    });
+  }
+  
+  if (stats.todayAbsent > 0) {
+    notifications.push({ 
+      id: "absent-notify", 
+      title: `${stats.todayAbsent} students absent - parents may need notification`, 
+      priority: "high" 
+    });
+  }
+  
+  if (stats.totalClasses === 0) {
+    notifications.push({ 
+      id: "no-classes", 
+      title: "No classes configured yet", 
+      priority: "normal" 
+    });
+  }
+  
+  if (stats.totalTeachers === 0) {
+    notifications.push({ 
+      id: "no-teachers", 
+      title: "No teachers added yet", 
+      priority: "normal" 
+    });
+  }
 
   const quickActions = [
     { label: "Add Student", link: "/admin/students", icon: GraduationCap },
