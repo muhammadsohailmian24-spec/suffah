@@ -92,6 +92,8 @@ const StudentManagement = () => {
     student_id: "",
     class_id: "",
     date_of_birth: "",
+    gender: "",
+    school_section: "Main",
     father_name: "",
     father_phone: "",
     father_cnic: "",
@@ -247,16 +249,18 @@ const StudentManagement = () => {
               photo_url: photoUrl,
               date_of_birth: addFormData.date_of_birth || null,
               address: addFormData.address || null,
+              gender: addFormData.gender || null,
             })
             .eq("user_id", studentUserId);
         }
       } else if (studentUserId) {
-        // Update profile with DOB and address even without photo
+        // Update profile with DOB, address and gender even without photo
         await supabase
           .from("profiles")
           .update({ 
             date_of_birth: addFormData.date_of_birth || null,
             address: addFormData.address || null,
+            gender: addFormData.gender || null,
           })
           .eq("user_id", studentUserId);
       }
@@ -272,7 +276,8 @@ const StudentManagement = () => {
             father_cnic: addFormData.father_cnic || null,
             father_email: addFormData.father_email || null,
             guardian_occupation: addFormData.occupation || null,
-          })
+            school_section: addFormData.school_section || "Main",
+          } as never)
           .eq("user_id", studentUserId)
           .select("id")
           .single();
@@ -484,6 +489,8 @@ const StudentManagement = () => {
       student_id: "",
       class_id: "",
       date_of_birth: "",
+      gender: "",
+      school_section: "Main",
       father_name: "",
       father_phone: "",
       father_cnic: "",
@@ -784,6 +791,27 @@ const StudentManagement = () => {
                   onChange={(e) => setAddFormData(p => ({ ...p, date_of_birth: e.target.value }))}
                   required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Gender *</Label>
+                <Select value={addFormData.gender} onValueChange={(v) => setAddFormData(p => ({ ...p, gender: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>School Section *</Label>
+                <Select value={addFormData.school_section} onValueChange={(v) => setAddFormData(p => ({ ...p, school_section: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Main">Main</SelectItem>
+                    <SelectItem value="Akhundabad">Akhundabad</SelectItem>
+                    <SelectItem value="J & G">J & G</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Student ID *</Label>
