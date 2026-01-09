@@ -248,15 +248,28 @@ const AdminExams = () => {
       .eq("id", exam.class_id)
       .single();
 
-    // Fetch results for this exam
+    // Fetch results for this exam (including created_at for the date)
     const studentIds = studentsData.map(s => s.id);
     const { data: resultsData } = await supabase
       .from("results")
-      .select("student_id, marks_obtained")
+      .select("student_id, marks_obtained, created_at")
       .eq("exam_id", exam.id)
       .in("student_id", studentIds);
 
     const resultsMap = new Map(resultsData?.map(r => [r.student_id, r.marks_obtained]) || []);
+
+    // Get the most recent result upload date
+    let resultUploadDate = "";
+    if (resultsData && resultsData.length > 0) {
+      const latestResult = resultsData.reduce((latest, current) => {
+        const latestDate = new Date(latest.created_at || 0);
+        const currentDate = new Date(current.created_at || 0);
+        return currentDate > latestDate ? current : latest;
+      });
+      if (latestResult.created_at) {
+        resultUploadDate = format(parseISO(latestResult.created_at), "dd-MMM-yyyy");
+      }
+    }
 
     // Fetch teacher name from timetable if available
     let teacherName = "";
@@ -300,7 +313,7 @@ const AdminExams = () => {
 
     await downloadAwardList({
       session: `${currentYear}`,
-      date: format(parseISO(exam.exam_date), "dd-MMM-yyyy"),
+      date: resultUploadDate || format(parseISO(exam.exam_date), "dd-MMM-yyyy"),
       className: classData?.name || exam.classes?.name || "",
       section: classData?.section || "",
       subject: exam.subjects?.name || "",
