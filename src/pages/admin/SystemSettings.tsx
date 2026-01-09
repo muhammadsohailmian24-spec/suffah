@@ -9,17 +9,44 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Building, Palette, Calendar, Bell, Database } from "lucide-react";
+import { Save, Building, Calendar, Bell, Database, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import AdminLayout from "@/components/admin/AdminLayout";
+
+interface SchoolInfo {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  motto: string;
+}
+
+interface AcademicSettings {
+  currentYear: string;
+  currentSemester: string;
+  gradeScale: string;
+  passingMarks: string;
+}
+
+interface NotificationSettings {
+  emailEnabled: boolean;
+  smsEnabled: boolean;
+  pushEnabled: boolean;
+  attendanceAlerts: boolean;
+  resultAlerts: boolean;
+  feeReminders: boolean;
+}
 
 const SystemSettings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingSchool, setSavingSchool] = useState(false);
+  const [savingAcademic, setSavingAcademic] = useState(false);
+  const [savingNotification, setSavingNotification] = useState(false);
 
-  const [schoolInfo, setSchoolInfo] = useState({
+  const [schoolInfo, setSchoolInfo] = useState<SchoolInfo>({
     name: "The Suffah School",
     address: "123 Education Street, Knowledge City",
     phone: "+1 234 567 890",
@@ -28,14 +55,14 @@ const SystemSettings = () => {
     motto: "Excellence in Education",
   });
 
-  const [academicSettings, setAcademicSettings] = useState({
+  const [academicSettings, setAcademicSettings] = useState<AcademicSettings>({
     currentYear: "2024-2025",
     currentSemester: "1",
     gradeScale: "percentage",
     passingMarks: "40",
   });
 
-  const [notificationSettings, setNotificationSettings] = useState({
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     emailEnabled: true,
     smsEnabled: true,
     pushEnabled: false,
@@ -45,10 +72,10 @@ const SystemSettings = () => {
   });
 
   useEffect(() => {
-    checkAuth();
+    checkAuthAndLoadSettings();
   }, []);
 
-  const checkAuth = async () => {
+  const checkAuthAndLoadSettings = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { navigate("/auth"); return; }
 
@@ -63,31 +90,114 @@ const SystemSettings = () => {
       return; 
     }
 
+    // Load settings from database
+    await loadSettings();
     setLoading(false);
   };
 
-  const handleSaveSchoolInfo = () => {
-    setSaving(true);
-    setTimeout(() => {
-      toast({ title: "Success", description: "School information saved" });
-      setSaving(false);
-    }, 1000);
+  const loadSettings = async () => {
+    const { data, error } = await supabase
+      .from("system_settings")
+      .select("setting_key, setting_value");
+
+    if (error) {
+      console.error("Error loading settings:", error);
+      return;
+    }
+
+    if (data) {
+      data.forEach((setting) => {
+        const value = setting.setting_value as Record<string, unknown>;
+        switch (setting.setting_key) {
+          case "school_info":
+            setSchoolInfo(value as unknown as SchoolInfo);
+            break;
+          case "academic_settings":
+            setAcademicSettings(value as unknown as AcademicSettings);
+            break;
+          case "notification_settings":
+            setNotificationSettings(value as unknown as NotificationSettings);
+            break;
+        }
+      });
+    }
   };
 
-  const handleSaveAcademicSettings = () => {
-    setSaving(true);
-    setTimeout(() => {
-      toast({ title: "Success", description: "Academic settings saved" });
-      setSaving(false);
-    }, 1000);
+  const saveSetting = async (key: string, value: unknown) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // First check if the setting exists
+    const { data: existing } = await supabase
+      .from("system_settings")
+      .select("id")
+      .eq("setting_key", key)
+      .maybeSingle();
+
+    if (existing) {
+      // Update existing
+      const { error } = await supabase
+        .from("system_settings")
+        .update({ 
+          setting_value: value,
+          updated_by: session?.user.id 
+        } as never)
+        .eq("setting_key", key);
+
+      if (error) {
+        console.error("Error updating setting:", error);
+        throw error;
+      }
+    } else {
+      // Insert new
+      const { error } = await supabase
+        .from("system_settings")
+        .insert({ 
+          setting_key: key, 
+          setting_value: value,
+          updated_by: session?.user.id 
+        } as never);
+
+      if (error) {
+        console.error("Error inserting setting:", error);
+        throw error;
+      }
+    }
   };
 
-  const handleSaveNotificationSettings = () => {
-    setSaving(true);
-    setTimeout(() => {
-      toast({ title: "Success", description: "Notification settings saved" });
-      setSaving(false);
-    }, 1000);
+  const handleSaveSchoolInfo = async () => {
+    setSavingSchool(true);
+    try {
+      await saveSetting("school_info", schoolInfo);
+      toast({ title: "Success", description: "School information saved successfully" });
+    } catch {
+      toast({ title: "Error", description: "Failed to save school information", variant: "destructive" });
+    } finally {
+      setSavingSchool(false);
+    }
+  };
+
+  const handleSaveAcademicSettings = async () => {
+    setSavingAcademic(true);
+    try {
+      await saveSetting("academic_settings", academicSettings);
+      toast({ title: "Success", description: "Academic settings saved successfully" });
+    } catch {
+      toast({ title: "Error", description: "Failed to save academic settings", variant: "destructive" });
+    } finally {
+      setSavingAcademic(false);
+    }
+  };
+
+  const handleSaveNotificationSettings = async () => {
+    setSavingNotification(true);
+    try {
+      await saveSetting("notification_settings", notificationSettings);
+      toast({ title: "Success", description: "Notification settings saved successfully" });
+    } catch {
+      toast({ title: "Error", description: "Failed to save notification settings", variant: "destructive" });
+    } finally {
+      setSavingNotification(false);
+    }
   };
 
   const handleBackup = () => {
@@ -172,8 +282,9 @@ const SystemSettings = () => {
               </div>
             </div>
             <div className="flex justify-end">
-              <Button onClick={handleSaveSchoolInfo} disabled={saving} className="gap-2">
-                <Save className="w-4 h-4" /> Save Changes
+              <Button onClick={handleSaveSchoolInfo} disabled={savingSchool} className="gap-2">
+                {savingSchool ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save Changes
               </Button>
             </div>
           </CardContent>
@@ -232,8 +343,9 @@ const SystemSettings = () => {
               </div>
             </div>
             <div className="flex justify-end">
-              <Button onClick={handleSaveAcademicSettings} disabled={saving} className="gap-2">
-                <Save className="w-4 h-4" /> Save Changes
+              <Button onClick={handleSaveAcademicSettings} disabled={savingAcademic} className="gap-2">
+                {savingAcademic ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save Changes
               </Button>
             </div>
           </CardContent>
@@ -311,8 +423,9 @@ const SystemSettings = () => {
               </div>
             </div>
             <div className="flex justify-end">
-              <Button onClick={handleSaveNotificationSettings} disabled={saving} className="gap-2">
-                <Save className="w-4 h-4" /> Save Changes
+              <Button onClick={handleSaveNotificationSettings} disabled={savingNotification} className="gap-2">
+                {savingNotification ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save Changes
               </Button>
             </div>
           </CardContent>
