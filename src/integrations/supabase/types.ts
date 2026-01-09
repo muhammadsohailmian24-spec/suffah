@@ -831,6 +831,7 @@ export type Database = {
           mother_name: string | null
           mother_phone: string | null
           previous_school: string | null
+          school_section: string | null
           status: string | null
           student_id: string
           updated_at: string
@@ -852,6 +853,7 @@ export type Database = {
           mother_name?: string | null
           mother_phone?: string | null
           previous_school?: string | null
+          school_section?: string | null
           status?: string | null
           student_id: string
           updated_at?: string
@@ -873,6 +875,7 @@ export type Database = {
           mother_name?: string | null
           mother_phone?: string | null
           previous_school?: string | null
+          school_section?: string | null
           status?: string | null
           student_id?: string
           updated_at?: string
