@@ -1,0 +1,475 @@
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+interface StudentFeeRecord {
+  studentId: string;
+  studentName: string;
+  rollNo: string;
+  feeName: string;
+  feeType: string;
+  totalAmount: number;
+  paidAmount: number;
+  balance: number;
+  status: string;
+  dueDate: string;
+  lastPaymentDate?: string;
+}
+
+interface ClassFeeReportData {
+  className: string;
+  reportMonth?: string;
+  reportDate: string;
+  students: StudentFeeRecord[];
+  schoolName?: string;
+  schoolAddress?: string;
+  schoolPhone?: string;
+}
+
+interface IndividualFeeReportData {
+  studentName: string;
+  studentId: string;
+  rollNo: string;
+  className: string;
+  fatherName?: string;
+  phone?: string;
+  reportDate: string;
+  fees: {
+    feeName: string;
+    feeType: string;
+    amount: number;
+    discount: number;
+    finalAmount: number;
+    paidAmount: number;
+    balance: number;
+    status: string;
+    dueDate: string;
+  }[];
+  payments: {
+    date: string;
+    feeName: string;
+    amount: number;
+    method: string;
+    receiptNumber: string | null;
+  }[];
+  schoolName?: string;
+  schoolAddress?: string;
+  schoolPhone?: string;
+}
+
+const loadSchoolLogo = async (doc: jsPDF, x: number, y: number, width: number, height: number): Promise<void> => {
+  try {
+    const logoImg = new Image();
+    logoImg.crossOrigin = "anonymous";
+    await new Promise<void>((resolve, reject) => {
+      logoImg.onload = () => {
+        doc.addImage(logoImg, "PNG", x, y, width, height);
+        resolve();
+      };
+      logoImg.onerror = reject;
+      logoImg.src = "/images/school-logo.png";
+    });
+  } catch (e) {
+    // Continue without logo
+  }
+};
+
+export const generateClassFeeReportPdf = async (data: ClassFeeReportData) => {
+  const doc = new jsPDF({ orientation: "landscape" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  
+  // Colors
+  const primaryColor: [number, number, number] = [30, 100, 180];
+  const goldColor: [number, number, number] = [180, 140, 20];
+  const darkColor: [number, number, number] = [30, 30, 30];
+  const grayColor: [number, number, number] = [100, 100, 100];
+  
+  // Header background
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, pageWidth, 35, "F");
+  
+  // Gold accent line
+  doc.setFillColor(...goldColor);
+  doc.rect(0, 35, pageWidth, 2, "F");
+  
+  // Logo
+  await loadSchoolLogo(doc, 10, 5, 25, 25);
+  
+  // School name
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text(data.schoolName || "The Suffah Public School & College", 40, 15);
+  
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", 40, 23);
+  doc.text(`Phone: ${data.schoolPhone || "+92 000 000 0000"}`, 40, 30);
+  
+  // Report title
+  doc.setTextColor(...darkColor);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("FEE COLLECTION REPORT", pageWidth / 2, 48, { align: "center" });
+  
+  // Class and date info
+  doc.setFontSize(11);
+  doc.setTextColor(...grayColor);
+  doc.text(`Class: ${data.className}`, 20, 58);
+  doc.text(`Report Date: ${data.reportDate}`, pageWidth - 20, 58, { align: "right" });
+  if (data.reportMonth) {
+    doc.text(`Month: ${data.reportMonth}`, pageWidth / 2, 58, { align: "center" });
+  }
+  
+  // Summary statistics
+  const totalFees = data.students.reduce((sum, s) => sum + s.totalAmount, 0);
+  const totalPaid = data.students.reduce((sum, s) => sum + s.paidAmount, 0);
+  const totalBalance = data.students.reduce((sum, s) => sum + s.balance, 0);
+  const paidCount = data.students.filter(s => s.status === "paid").length;
+  const pendingCount = data.students.filter(s => s.status === "pending" || s.status === "partial").length;
+  
+  // Stats boxes
+  const statsY = 65;
+  const boxWidth = 50;
+  const boxGap = 10;
+  const startX = (pageWidth - (boxWidth * 5 + boxGap * 4)) / 2;
+  
+  const stats = [
+    { label: "Total Students", value: data.students.length.toString(), color: primaryColor },
+    { label: "Total Fees", value: `PKR ${totalFees.toLocaleString()}`, color: [100, 100, 100] as [number, number, number] },
+    { label: "Collected", value: `PKR ${totalPaid.toLocaleString()}`, color: [34, 197, 94] as [number, number, number] },
+    { label: "Pending", value: `PKR ${totalBalance.toLocaleString()}`, color: [239, 68, 68] as [number, number, number] },
+    { label: "Paid/Pending", value: `${paidCount}/${pendingCount}`, color: goldColor },
+  ];
+  
+  stats.forEach((stat, index) => {
+    const x = startX + (boxWidth + boxGap) * index;
+    doc.setFillColor(245, 247, 250);
+    doc.roundedRect(x, statsY, boxWidth, 20, 2, 2, "F");
+    
+    doc.setFontSize(8);
+    doc.setTextColor(...grayColor);
+    doc.text(stat.label, x + boxWidth / 2, statsY + 7, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...stat.color);
+    doc.text(stat.value, x + boxWidth / 2, statsY + 15, { align: "center" });
+  });
+  
+  // Student fees table
+  autoTable(doc, {
+    startY: statsY + 28,
+    head: [["#", "Roll No", "Student Name", "Fee Type", "Total Amount", "Paid", "Balance", "Due Date", "Status"]],
+    body: data.students.map((student, index) => [
+      (index + 1).toString(),
+      student.rollNo,
+      student.studentName,
+      student.feeType.charAt(0).toUpperCase() + student.feeType.slice(1),
+      `PKR ${student.totalAmount.toLocaleString()}`,
+      `PKR ${student.paidAmount.toLocaleString()}`,
+      `PKR ${student.balance.toLocaleString()}`,
+      student.dueDate,
+      student.status.toUpperCase(),
+    ]),
+    headStyles: {
+      fillColor: primaryColor,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 9,
+    },
+    bodyStyles: {
+      fontSize: 8,
+      textColor: darkColor,
+    },
+    alternateRowStyles: {
+      fillColor: [250, 250, 252],
+    },
+    columnStyles: {
+      0: { cellWidth: 10, halign: "center" },
+      1: { cellWidth: 25 },
+      2: { cellWidth: 50 },
+      3: { cellWidth: 30 },
+      4: { cellWidth: 35, halign: "right" },
+      5: { cellWidth: 30, halign: "right" },
+      6: { cellWidth: 30, halign: "right" },
+      7: { cellWidth: 25 },
+      8: { cellWidth: 25, halign: "center" },
+    },
+    margin: { left: 10, right: 10 },
+    didParseCell: (data) => {
+      if (data.section === "body" && data.column.index === 8) {
+        const status = data.cell.raw?.toString().toLowerCase();
+        if (status === "paid") {
+          data.cell.styles.textColor = [34, 197, 94];
+          data.cell.styles.fontStyle = "bold";
+        } else if (status === "overdue") {
+          data.cell.styles.textColor = [239, 68, 68];
+          data.cell.styles.fontStyle = "bold";
+        } else if (status === "partial") {
+          data.cell.styles.textColor = [234, 179, 8];
+          data.cell.styles.fontStyle = "bold";
+        }
+      }
+    },
+  });
+  
+  // Footer
+  const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(10, pageHeight - 15, pageWidth - 10, pageHeight - 15);
+  
+  doc.setFontSize(8);
+  doc.setTextColor(...grayColor);
+  doc.text("This is a computer-generated report.", pageWidth / 2, pageHeight - 10, { align: "center" });
+  doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, pageHeight - 5, { align: "center" });
+  
+  return doc;
+};
+
+export const generateIndividualFeeReportPdf = async (data: IndividualFeeReportData) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  
+  // Colors
+  const primaryColor: [number, number, number] = [30, 100, 180];
+  const goldColor: [number, number, number] = [180, 140, 20];
+  const darkColor: [number, number, number] = [30, 30, 30];
+  const grayColor: [number, number, number] = [100, 100, 100];
+  
+  // Header background
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, pageWidth, 45, "F");
+  
+  // Gold accent line
+  doc.setFillColor(...goldColor);
+  doc.rect(0, 45, pageWidth, 2, "F");
+  
+  // Logo
+  await loadSchoolLogo(doc, 10, 7, 30, 30);
+  
+  // School name
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text(data.schoolName || "The Suffah Public School & College", 45, 18);
+  
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", 45, 27);
+  doc.text(`Phone: ${data.schoolPhone || "+92 000 000 0000"}`, 45, 35);
+  
+  // Report title
+  doc.setTextColor(...darkColor);
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text("STUDENT FEE REPORT", pageWidth / 2, 60, { align: "center" });
+  
+  // Student info card
+  doc.setFillColor(250, 250, 252);
+  doc.roundedRect(15, 68, pageWidth - 30, 35, 3, 3, "F");
+  doc.setDrawColor(...primaryColor);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(15, 68, pageWidth - 30, 35, 3, 3, "S");
+  
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...primaryColor);
+  doc.text("STUDENT DETAILS", 20, 77);
+  
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...darkColor);
+  
+  const col1X = 20;
+  const col2X = 110;
+  let infoY = 85;
+  
+  doc.setFont("helvetica", "bold");
+  doc.text("Name:", col1X, infoY);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.studentName, col1X + 25, infoY);
+  
+  doc.setFont("helvetica", "bold");
+  doc.text("Class:", col2X, infoY);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.className, col2X + 20, infoY);
+  
+  infoY += 8;
+  doc.setFont("helvetica", "bold");
+  doc.text("Student ID:", col1X, infoY);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.studentId, col1X + 30, infoY);
+  
+  doc.setFont("helvetica", "bold");
+  doc.text("Roll No:", col2X, infoY);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.rollNo, col2X + 23, infoY);
+  
+  infoY += 8;
+  if (data.fatherName) {
+    doc.setFont("helvetica", "bold");
+    doc.text("Father:", col1X, infoY);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.fatherName, col1X + 22, infoY);
+  }
+  
+  doc.setFont("helvetica", "bold");
+  doc.text("Report Date:", col2X, infoY);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.reportDate, col2X + 35, infoY);
+  
+  // Summary stats
+  const totalFees = data.fees.reduce((sum, f) => sum + f.finalAmount, 0);
+  const totalPaid = data.fees.reduce((sum, f) => sum + f.paidAmount, 0);
+  const totalBalance = data.fees.reduce((sum, f) => sum + f.balance, 0);
+  
+  const statsY = 112;
+  const statBoxWidth = (pageWidth - 50) / 3;
+  
+  const summaryStats = [
+    { label: "Total Fees", value: `PKR ${totalFees.toLocaleString()}`, color: darkColor },
+    { label: "Total Paid", value: `PKR ${totalPaid.toLocaleString()}`, color: [34, 197, 94] as [number, number, number] },
+    { label: "Balance Due", value: `PKR ${totalBalance.toLocaleString()}`, color: totalBalance > 0 ? [239, 68, 68] : [34, 197, 94] as [number, number, number] },
+  ];
+  
+  summaryStats.forEach((stat, index) => {
+    const x = 20 + (statBoxWidth + 5) * index;
+    doc.setFillColor(245, 247, 250);
+    doc.roundedRect(x, statsY, statBoxWidth, 18, 2, 2, "F");
+    
+    doc.setFontSize(8);
+    doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
+    doc.text(stat.label, x + statBoxWidth / 2, statsY + 6, { align: "center" });
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(stat.color[0], stat.color[1], stat.color[2]);
+    doc.text(stat.value, x + statBoxWidth / 2, statsY + 14, { align: "center" });
+  });
+  
+  // Fee details table
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...primaryColor);
+  doc.text("FEE DETAILS", 20, 142);
+  
+  autoTable(doc, {
+    startY: 146,
+    head: [["Fee Name", "Type", "Amount", "Discount", "Final", "Paid", "Balance", "Status"]],
+    body: data.fees.map((fee) => [
+      fee.feeName,
+      fee.feeType.charAt(0).toUpperCase() + fee.feeType.slice(1),
+      `PKR ${fee.amount.toLocaleString()}`,
+      `PKR ${fee.discount.toLocaleString()}`,
+      `PKR ${fee.finalAmount.toLocaleString()}`,
+      `PKR ${fee.paidAmount.toLocaleString()}`,
+      `PKR ${fee.balance.toLocaleString()}`,
+      fee.status.toUpperCase(),
+    ]),
+    headStyles: {
+      fillColor: primaryColor,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 9,
+    },
+    bodyStyles: {
+      fontSize: 9,
+      textColor: darkColor,
+    },
+    alternateRowStyles: {
+      fillColor: [250, 250, 252],
+    },
+    margin: { left: 15, right: 15 },
+    didParseCell: (data) => {
+      if (data.section === "body" && data.column.index === 7) {
+        const status = data.cell.raw?.toString().toLowerCase();
+        if (status === "paid") {
+          data.cell.styles.textColor = [34, 197, 94];
+          data.cell.styles.fontStyle = "bold";
+        } else if (status === "overdue") {
+          data.cell.styles.textColor = [239, 68, 68];
+          data.cell.styles.fontStyle = "bold";
+        } else if (status === "partial") {
+          data.cell.styles.textColor = [234, 179, 8];
+          data.cell.styles.fontStyle = "bold";
+        }
+      }
+    },
+  });
+  
+  // Payment history
+  if (data.payments.length > 0) {
+    const paymentY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...primaryColor);
+    doc.text("PAYMENT HISTORY", 20, paymentY);
+    
+    autoTable(doc, {
+      startY: paymentY + 4,
+      head: [["Date", "Fee Name", "Amount", "Method", "Receipt #"]],
+      body: data.payments.map((p) => [
+        p.date,
+        p.feeName,
+        `PKR ${p.amount.toLocaleString()}`,
+        p.method.charAt(0).toUpperCase() + p.method.slice(1),
+        p.receiptNumber || "-",
+      ]),
+      headStyles: {
+        fillColor: [80, 80, 80],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 9,
+      },
+      bodyStyles: {
+        fontSize: 9,
+        textColor: darkColor,
+      },
+      alternateRowStyles: {
+        fillColor: [250, 250, 252],
+      },
+      margin: { left: 15, right: 15 },
+    });
+  }
+  
+  // Footer
+  const pageHeight = doc.internal.pageSize.getHeight();
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(15, pageHeight - 20, pageWidth - 15, pageHeight - 20);
+  
+  doc.setFontSize(8);
+  doc.setTextColor(...grayColor);
+  doc.text("This is a computer-generated report and does not require a signature.", pageWidth / 2, pageHeight - 14, { align: "center" });
+  doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+  
+  return doc;
+};
+
+export const downloadClassFeeReport = async (data: ClassFeeReportData) => {
+  const doc = await generateClassFeeReportPdf(data);
+  const filename = `Fee-Report-${data.className.replace(/\s+/g, "-")}-${data.reportDate.replace(/\//g, "-")}.pdf`;
+  doc.save(filename);
+};
+
+export const downloadIndividualFeeReport = async (data: IndividualFeeReportData) => {
+  const doc = await generateIndividualFeeReportPdf(data);
+  const filename = `Fee-Report-${data.studentName.replace(/\s+/g, "-")}-${data.reportDate.replace(/\//g, "-")}.pdf`;
+  doc.save(filename);
+};
+
+export const printClassFeeReport = async (data: ClassFeeReportData) => {
+  const doc = await generateClassFeeReportPdf(data);
+  doc.autoPrint();
+  window.open(doc.output("bloburl"), "_blank");
+};
+
+export const printIndividualFeeReport = async (data: IndividualFeeReportData) => {
+  const doc = await generateIndividualFeeReportPdf(data);
+  doc.autoPrint();
+  window.open(doc.output("bloburl"), "_blank");
+};
