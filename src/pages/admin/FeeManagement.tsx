@@ -11,10 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Receipt, CreditCard, FileText, Loader2, Search, Download, Printer, Mail } from "lucide-react";
+import { Plus, Receipt, CreditCard, FileText, Loader2, Search, Download, Printer, Mail, Users, User } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { downloadInvoice, printInvoice } from "@/utils/generateInvoicePdf";
 import { downloadReceipt, printReceipt } from "@/utils/generateReceiptPdf";
+import { downloadClassFeeReport, downloadIndividualFeeReport } from "@/utils/generateFeeReportPdf";
 
 interface FeeStructure {
   id: string;
@@ -57,14 +58,24 @@ const FeeManagement = () => {
   const [studentFees, setStudentFees] = useState<StudentFee[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
-  const [students, setStudents] = useState<{ id: string; student_id: string; user_id: string }[]>([]);
+  const [students, setStudents] = useState<{ id: string; student_id: string; user_id: string; class_id?: string }[]>([]);
+  const [profiles, setProfiles] = useState<{ user_id: string; full_name: string }[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   
   // Dialog states
   const [feeStructureDialog, setFeeStructureDialog] = useState(false);
   const [assignFeeDialog, setAssignFeeDialog] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState(false);
+  const [reportDialog, setReportDialog] = useState(false);
   const [selectedStudentFee, setSelectedStudentFee] = useState<StudentFee | null>(null);
+  
+  // Report form state
+  const [reportForm, setReportForm] = useState({
+    reportType: "class" as "class" | "individual",
+    classId: "",
+    studentId: ""
+  });
+  const [generatingReport, setGeneratingReport] = useState(false);
   
   // Form states
   const [feeForm, setFeeForm] = useState({
@@ -97,15 +108,17 @@ const FeeManagement = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [feeStructuresRes, classesRes, studentsRes] = await Promise.all([
+      const [feeStructuresRes, classesRes, studentsRes, profilesRes] = await Promise.all([
         supabase.from("fee_structures").select("*").order("created_at", { ascending: false }),
         supabase.from("classes").select("id, name"),
-        supabase.from("students").select("id, student_id, user_id")
+        supabase.from("students").select("id, student_id, user_id, class_id, father_name"),
+        supabase.from("profiles").select("user_id, full_name, phone")
       ]);
 
       if (feeStructuresRes.data) setFeeStructures(feeStructuresRes.data);
       if (classesRes.data) setClasses(classesRes.data);
       if (studentsRes.data) setStudents(studentsRes.data);
+      if (profilesRes.data) setProfiles(profilesRes.data);
 
       await fetchStudentFees();
       await fetchPayments();
@@ -344,6 +357,120 @@ const FeeManagement = () => {
       .reduce((sum, p) => sum + p.amount, 0);
   };
 
+  const handleDownloadReport = async () => {
+    setGeneratingReport(true);
+    try {
+      if (reportForm.reportType === "class") {
+        if (!reportForm.classId) {
+          toast.error("Please select a class");
+          return;
+        }
+        
+        const selectedClass = classes.find(c => c.id === reportForm.classId);
+        const classStudents = students.filter(s => s.class_id === reportForm.classId);
+        
+        // Get fees for students in this class
+        const classStudentFees = studentFees.filter(sf => 
+          classStudents.some(cs => cs.id === sf.student_id)
+        );
+        
+        const studentRecords = classStudentFees.map(sf => {
+          const student = students.find(s => s.id === sf.student_id);
+          const profile = profiles.find(p => p.user_id === student?.user_id);
+          const paidAmount = calculatePaidAmount(sf.id);
+          
+          return {
+            studentId: sf.id,
+            studentName: profile?.full_name || sf.student?.profiles?.full_name || "Unknown",
+            rollNo: student?.student_id || "",
+            feeName: sf.fee_structure?.name || "Fee",
+            feeType: feeStructures.find(f => f.id === sf.fee_structure_id)?.fee_type || "tuition",
+            totalAmount: sf.final_amount,
+            paidAmount: paidAmount,
+            balance: sf.final_amount - paidAmount,
+            status: sf.status,
+            dueDate: new Date(sf.due_date).toLocaleDateString(),
+          };
+        });
+        
+        await downloadClassFeeReport({
+          className: selectedClass?.name || "Unknown Class",
+          reportDate: new Date().toLocaleDateString(),
+          students: studentRecords,
+        });
+        
+        toast.success("Class fee report downloaded");
+      } else {
+        if (!reportForm.studentId) {
+          toast.error("Please select a student");
+          return;
+        }
+        
+        const student = students.find(s => s.id === reportForm.studentId);
+        const profile = profiles.find(p => p.user_id === student?.user_id);
+        const studentClass = classes.find(c => c.id === student?.class_id);
+        
+        // Get all fees for this student
+        const studentFeeRecords = studentFees.filter(sf => sf.student_id === reportForm.studentId);
+        
+        const fees = studentFeeRecords.map(sf => {
+          const paidAmount = calculatePaidAmount(sf.id);
+          return {
+            feeName: sf.fee_structure?.name || "Fee",
+            feeType: feeStructures.find(f => f.id === sf.fee_structure_id)?.fee_type || "tuition",
+            amount: sf.amount,
+            discount: sf.discount,
+            finalAmount: sf.final_amount,
+            paidAmount: paidAmount,
+            balance: sf.final_amount - paidAmount,
+            status: sf.status,
+            dueDate: new Date(sf.due_date).toLocaleDateString(),
+          };
+        });
+        
+        // Get payments for this student
+        const studentPayments = payments
+          .filter(p => studentFeeRecords.some(sf => sf.id === p.student_fee_id))
+          .map(p => {
+            const sf = studentFeeRecords.find(sf => sf.id === p.student_fee_id);
+            return {
+              date: new Date(p.payment_date).toLocaleDateString(),
+              feeName: sf?.fee_structure?.name || "Fee",
+              amount: p.amount,
+              method: p.payment_method,
+              receiptNumber: p.receipt_number,
+            };
+          });
+        
+        await downloadIndividualFeeReport({
+          studentName: profile?.full_name || "Unknown",
+          studentId: student?.student_id || "",
+          rollNo: student?.student_id || "",
+          className: studentClass?.name || "Unknown",
+          fatherName: (student as any)?.father_name || undefined,
+          phone: (profile as any)?.phone || undefined,
+          reportDate: new Date().toLocaleDateString(),
+          fees: fees,
+          payments: studentPayments,
+        });
+        
+        toast.success("Individual fee report downloaded");
+      }
+      
+      setReportDialog(false);
+    } catch (error) {
+      console.error("Error generating report:", error);
+      toast.error("Failed to generate report");
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
+  // Filter students by class for individual report
+  const filteredStudentsForReport = reportForm.classId 
+    ? students.filter(s => s.class_id === reportForm.classId)
+    : students;
+
   const filteredStudentFees = studentFees.filter(sf => 
     sf.student?.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     sf.student?.student_id?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -412,6 +539,101 @@ const FeeManagement = () => {
             <TabsTrigger value="history">Payment History</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
+            <Dialog open={reportDialog} onOpenChange={setReportDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Download Report
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Download Fee Report</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Report Type</Label>
+                    <Select 
+                      value={reportForm.reportType} 
+                      onValueChange={(v: "class" | "individual") => setReportForm({ ...reportForm, reportType: v, studentId: "" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="class">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            Class Report
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="individual">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            Individual Student Report
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>Select Class *</Label>
+                    <Select 
+                      value={reportForm.classId} 
+                      onValueChange={(v) => setReportForm({ ...reportForm, classId: v, studentId: "" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classes.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {reportForm.reportType === "individual" && (
+                    <div>
+                      <Label>Select Student *</Label>
+                      <Select 
+                        value={reportForm.studentId} 
+                        onValueChange={(v) => setReportForm({ ...reportForm, studentId: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select student" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredStudentsForReport.map((student) => {
+                            const profile = profiles.find(p => p.user_id === student.user_id);
+                            return (
+                              <SelectItem key={student.id} value={student.id}>
+                                {profile?.full_name || student.student_id} ({student.student_id})
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  
+                  <Button onClick={handleDownloadReport} className="w-full" disabled={generatingReport}>
+                    {generatingReport ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Report
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
             <Dialog open={feeStructureDialog} onOpenChange={setFeeStructureDialog}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm">
