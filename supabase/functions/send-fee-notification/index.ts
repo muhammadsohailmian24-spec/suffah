@@ -364,6 +364,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const requestData: FeeNotificationRequest = await req.json();
@@ -371,8 +372,48 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Processing ${type} fee notification`);
 
-    // For payment reminders (cron job), fetch overdue fees
+    // For payment reminders (cron job), skip auth check but verify cron secret
     if (type === "payment_reminder" || type === "overdue") {
+      // These are triggered by cron jobs, so we check for cron secret or admin auth
+      const cronSecret = req.headers.get("X-Cron-Secret");
+      const authHeader = req.headers.get("Authorization");
+      
+      let isAuthorized = false;
+      
+      // Check cron secret first
+      if (cronSecret && cronSecret === Deno.env.get("CRON_SECRET")) {
+        isAuthorized = true;
+      }
+      
+      // Or check if it's an admin making the request
+      if (!isAuthorized && authHeader) {
+        const token = authHeader.replace("Bearer ", "");
+        const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } }
+        });
+        
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (user) {
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id)
+            .eq("role", "admin")
+            .maybeSingle();
+          
+          if (roleData) {
+            isAuthorized = true;
+          }
+        }
+      }
+      
+      if (!isAuthorized) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized - requires cron secret or admin role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const today = new Date().toISOString().split("T")[0];
       
       const { data: overdueFees, error } = await supabase
@@ -467,7 +508,43 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // For fee_assigned and payment_received notifications
+    // For fee_assigned and payment_received notifications - require admin or teacher auth
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check if user is admin or teacher
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .in("role", ['admin', 'teacher'])
+      .maybeSingle();
+
+    if (!roleData) {
+      return new Response(
+        JSON.stringify({ error: "Only admins and teachers can send fee notifications" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (!studentId) {
       throw new Error("studentId is required for this notification type");
     }
