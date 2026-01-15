@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +27,6 @@ interface TimetableEntry {
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const AdminTimetable = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [entries, setEntries] = useState<TimetableEntry[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
@@ -183,98 +181,85 @@ const AdminTimetable = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <AdminLayout title="Timetable Management" description="Create and manage class schedules">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </AdminLayout>
     );
   }
 
   return (
     <AdminLayout title="Timetable Management" description="Create and manage class schedules">
-      <div className="flex items-center justify-end gap-4 mb-6">
-        <Select value={selectedClass} onValueChange={setSelectedClass}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Select class" />
-          </SelectTrigger>
-          <SelectContent>
-            {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select class" />
-              </SelectTrigger>
-              <SelectContent>
-                {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-              <DialogTrigger asChild>
-                <Button><Plus className="h-4 w-4 mr-2" />Add Slot</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingEntry ? "Edit Slot" : "Add Timetable Slot"}</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Day</Label>
-                      <Select value={formData.day_of_week} onValueChange={(v) => setFormData({ ...formData, day_of_week: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {DAYS.map((day, i) => <SelectItem key={i} value={String(i)}>{day}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Room</Label>
-                      <Input value={formData.room_number} onChange={(e) => setFormData({ ...formData, room_number: e.target.value })} placeholder="e.g., A101" />
-                    </div>
-                    <div>
-                      <Label>Start Time</Label>
-                      <Input type="time" value={formData.start_time} onChange={(e) => setFormData({ ...formData, start_time: e.target.value })} required />
-                    </div>
-                    <div>
-                      <Label>End Time</Label>
-                      <Input type="time" value={formData.end_time} onChange={(e) => setFormData({ ...formData, end_time: e.target.value })} required />
-                    </div>
-                    <div>
-                      <Label>Subject</Label>
-                      <Select value={formData.subject_id} onValueChange={(v) => setFormData({ ...formData, subject_id: v })}>
-                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                        <SelectContent>
-                          {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Teacher</Label>
-                      <Select value={formData.teacher_id} onValueChange={(v) => setFormData({ ...formData, teacher_id: v })}>
-                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                        <SelectContent>
-                          {teachers.map(t => <SelectItem key={t.id} value={t.id}>{teacherProfiles[t.id] || t.employee_id}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
+      <div className="space-y-6">
+        <div className="flex items-center justify-end gap-4">
+          <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select class" />
+            </SelectTrigger>
+            <SelectContent>
+              {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+            <DialogTrigger asChild>
+              <Button><Plus className="h-4 w-4 mr-2" />Add Slot</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingEntry ? "Edit Slot" : "Add Timetable Slot"}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Day</Label>
+                    <Select value={formData.day_of_week} onValueChange={(v) => setFormData({ ...formData, day_of_week: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {DAYS.map((day, i) => <SelectItem key={i} value={String(i)}>{day}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                    <Button type="submit">{editingEntry ? "Update" : "Add"}</Button>
+                  <div>
+                    <Label>Room</Label>
+                    <Input value={formData.room_number} onChange={(e) => setFormData({ ...formData, room_number: e.target.value })} placeholder="e.g., A101" />
                   </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
+                  <div>
+                    <Label>Start Time</Label>
+                    <Input type="time" value={formData.start_time} onChange={(e) => setFormData({ ...formData, start_time: e.target.value })} required />
+                  </div>
+                  <div>
+                    <Label>End Time</Label>
+                    <Input type="time" value={formData.end_time} onChange={(e) => setFormData({ ...formData, end_time: e.target.value })} required />
+                  </div>
+                  <div>
+                    <Label>Subject</Label>
+                    <Select value={formData.subject_id} onValueChange={(v) => setFormData({ ...formData, subject_id: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                        {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Teacher</Label>
+                    <Select value={formData.teacher_id} onValueChange={(v) => setFormData({ ...formData, teacher_id: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                        {teachers.map(t => <SelectItem key={t.id} value={t.id}>{teacherProfiles[t.id] || t.employee_id}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit">{editingEntry ? "Update" : "Add"}</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
-      </header>
 
-      <main className="p-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -340,8 +325,9 @@ const AdminTimetable = () => {
                 </tbody>
               </table>
             </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </AdminLayout>
   );
 };

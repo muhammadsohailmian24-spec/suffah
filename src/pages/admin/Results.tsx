@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Award, Search } from "lucide-react";
+import { Award, Search, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import AdminLayout from "@/components/admin/AdminLayout";
 
@@ -219,30 +219,26 @@ const AdminResults = () => {
 
   if (loading && !selectedExam) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <AdminLayout title="Results Management" description="Select an exam to enter results">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => selectedExam ? setSelectedExam(null) : navigate("/admin/exams")}>
-              <ArrowLeft className="h-5 w-5" />
+    <AdminLayout 
+      title={selectedExam ? `Enter Results - ${selectedExam.name}` : "Results Management"}
+      description={selectedExam ? `${selectedExam.subjects?.name} • ${selectedExam.classes?.name}` : "Select an exam to enter results"}
+    >
+      <div className="space-y-6">
+        {selectedExam && (
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" onClick={() => setSelectedExam(null)}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Exams
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                {selectedExam ? `Enter Results - ${selectedExam.name}` : "Results Management"}
-              </h1>
-              <p className="text-muted-foreground">
-                {selectedExam ? `${selectedExam.subjects?.name} • ${selectedExam.classes?.name}` : "Select an exam to enter results"}
-              </p>
-            </div>
-          </div>
-          {selectedExam && (
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => saveResults(false)} disabled={saving}>
                 Save Draft
@@ -251,11 +247,9 @@ const AdminResults = () => {
                 Publish Results
               </Button>
             </div>
-          )}
-        </div>
-      </header>
+          </div>
+        )}
 
-      <main className="p-6">
         {!selectedExam ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {exams.map(exam => (
@@ -383,7 +377,7 @@ const AdminResults = () => {
             </CardContent>
           </Card>
         )}
-      </AdminLayout>
+      </div>
     </AdminLayout>
   );
 };
