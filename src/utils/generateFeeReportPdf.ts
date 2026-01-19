@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { loadLogo, addWatermark, drawStyledFooter, primaryColor, goldColor, darkColor, grayColor } from "./pdfDesignUtils";
 
 interface StudentFeeRecord {
   studentId: string;
@@ -56,63 +57,63 @@ export interface IndividualFeeReportData {
   schoolPhone?: string;
 }
 
-const loadSchoolLogo = async (doc: jsPDF, x: number, y: number, width: number, height: number): Promise<void> => {
-  try {
-    const logoImg = new Image();
-    logoImg.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      logoImg.onload = () => {
-        doc.addImage(logoImg, "PNG", x, y, width, height);
-        resolve();
-      };
-      logoImg.onerror = reject;
-      logoImg.src = "/images/school-logo.png";
-    });
-  } catch (e) {
-    // Continue without logo
-  }
-};
-
 export const generateClassFeeReportPdf = async (data: ClassFeeReportData): Promise<jsPDF> => {
   const doc = new jsPDF({ orientation: "landscape" });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const logoImg = await loadLogo();
   
-  // Colors
-  const primaryColor: [number, number, number] = [30, 100, 180];
-  const goldColor: [number, number, number] = [180, 140, 20];
-  const darkColor: [number, number, number] = [30, 30, 30];
-  const grayColor: [number, number, number] = [100, 100, 100];
+  // Add watermark
+  await addWatermark(doc);
   
   // Header background
   doc.setFillColor(...primaryColor);
-  doc.rect(0, 0, pageWidth, 35, "F");
+  doc.rect(0, 0, pageWidth, 38, "F");
   
-  // Gold accent line
+  // Gold accent stripe
   doc.setFillColor(...goldColor);
-  doc.rect(0, 35, pageWidth, 2, "F");
+  doc.rect(0, 38, pageWidth, 2, "F");
   
-  // Logo
-  await loadSchoolLogo(doc, 10, 5, 25, 25);
+  // Decorative circles in header
+  doc.setFillColor(255, 255, 255);
+  doc.circle(pageWidth - 25, 12, 28, 'F');
+  doc.circle(pageWidth - 55, -8, 20, 'F');
+  doc.circle(30, 30, 15, 'F');
+  
+  // Circular logo with gold ring
+  if (logoImg) {
+    const logoSize = 26;
+    const logoX = 10;
+    const logoY = 6;
+    
+    doc.setDrawColor(...goldColor);
+    doc.setLineWidth(1.5);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 2);
+    
+    doc.setFillColor(255, 255, 255);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 0.5, 'F');
+    
+    doc.addImage(logoImg, "PNG", logoX, logoY, logoSize, logoSize);
+  }
   
   // School name
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
+  doc.setFontSize(17);
   doc.setFont("helvetica", "bold");
-  doc.text(data.schoolName || "The Suffah Public School & College", 40, 15);
+  doc.text(data.schoolName || "The Suffah Public School & College", 42, 15);
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", 40, 23);
-  doc.text(`Phone: ${data.schoolPhone || "+92 000 000 0000"}`, 40, 30);
+  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", 42, 23);
+  doc.text(`Phone: ${data.schoolPhone || "+92 000 000 0000"}`, 42, 30);
   
   // Report title
   doc.setTextColor(...darkColor);
-  doc.setFontSize(16);
+  doc.setFontSize(15);
   doc.setFont("helvetica", "bold");
-  doc.text("ANNUAL FEE REPORT", pageWidth / 2, 48, { align: "center" });
+  doc.text("ANNUAL FEE REPORT", pageWidth / 2, 50, { align: "center" });
   
   // Class and date info
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(...grayColor);
   doc.text(`Class: ${data.className}`, 20, 58);
   doc.text(`Report Date: ${data.reportDate}`, pageWidth - 20, 58, { align: "right" });
@@ -127,7 +128,7 @@ export const generateClassFeeReportPdf = async (data: ClassFeeReportData): Promi
   const paidCount = data.students.filter(s => s.status === "paid").length;
   const pendingCount = data.students.filter(s => s.status === "pending" || s.status === "partial").length;
   
-  // Stats boxes
+  // Stats boxes with circular design accents
   const statsY = 65;
   const boxWidth = 50;
   const boxGap = 10;
@@ -144,21 +145,24 @@ export const generateClassFeeReportPdf = async (data: ClassFeeReportData): Promi
   stats.forEach((stat, index) => {
     const x = startX + (boxWidth + boxGap) * index;
     doc.setFillColor(245, 247, 250);
-    doc.roundedRect(x, statsY, boxWidth, 20, 2, 2, "F");
+    doc.roundedRect(x, statsY, boxWidth, 22, 3, 3, "F");
+    doc.setDrawColor(...stat.color);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(x, statsY, boxWidth, 22, 3, 3, "S");
     
     doc.setFontSize(8);
     doc.setTextColor(...grayColor);
-    doc.text(stat.label, x + boxWidth / 2, statsY + 7, { align: "center" });
+    doc.text(stat.label, x + boxWidth / 2, statsY + 8, { align: "center" });
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...stat.color);
-    doc.text(stat.value, x + boxWidth / 2, statsY + 15, { align: "center" });
+    doc.text(stat.value, x + boxWidth / 2, statsY + 17, { align: "center" });
   });
   
-  // Student fees table with 3 main columns: Total Fee, Paid, Balance
+  // Student fees table
   autoTable(doc, {
-    startY: statsY + 28,
+    startY: statsY + 30,
     head: [["#", "Roll No", "Student Name", "Total Fee (Yearly)", "Paid", "Balance", "Status"]],
     body: data.students.map((student, index) => [
       (index + 1).toString(),
@@ -189,7 +193,7 @@ export const generateClassFeeReportPdf = async (data: ClassFeeReportData): Promi
       textColor: darkColor,
     },
     footStyles: {
-      fillColor: [240, 240, 245],
+      fillColor: [255, 248, 220],
       textColor: darkColor,
       fontStyle: "bold",
       fontSize: 10,
@@ -248,18 +252,8 @@ export const generateClassFeeReportPdf = async (data: ClassFeeReportData): Promi
     },
   });
   
-  // Footer
-  const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-  const pageHeight = doc.internal.pageSize.getHeight();
-  
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.3);
-  doc.line(10, pageHeight - 15, pageWidth - 10, pageHeight - 15);
-  
-  doc.setFontSize(8);
-  doc.setTextColor(...grayColor);
-  doc.text("This is a computer-generated report.", pageWidth / 2, pageHeight - 10, { align: "center" });
-  doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, pageHeight - 5, { align: "center" });
+  // Apply styled footer
+  drawStyledFooter(doc, 1, 1, data.schoolAddress || "Madyan Swat, Pakistan");
   
   return doc;
 };
@@ -267,47 +261,64 @@ export const generateClassFeeReportPdf = async (data: ClassFeeReportData): Promi
 export const generateIndividualFeeReportPdf = async (data: IndividualFeeReportData): Promise<jsPDF> => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const logoImg = await loadLogo();
   
-  // Colors
-  const primaryColor: [number, number, number] = [30, 100, 180];
-  const goldColor: [number, number, number] = [180, 140, 20];
-  const darkColor: [number, number, number] = [30, 30, 30];
-  const grayColor: [number, number, number] = [100, 100, 100];
+  // Add watermark
+  await addWatermark(doc);
   
   // Header background
   doc.setFillColor(...primaryColor);
   doc.rect(0, 0, pageWidth, 45, "F");
   
-  // Gold accent line
+  // Gold accent stripe
   doc.setFillColor(...goldColor);
-  doc.rect(0, 45, pageWidth, 2, "F");
+  doc.rect(0, 45, pageWidth, 3, "F");
   
-  // Logo
-  await loadSchoolLogo(doc, 10, 7, 30, 30);
+  // Decorative circles in header
+  doc.setFillColor(255, 255, 255);
+  doc.circle(pageWidth - 20, 12, 25, 'F');
+  doc.circle(pageWidth - 45, -5, 18, 'F');
+  doc.circle(25, 38, 12, 'F');
+  
+  // Circular logo with gold ring
+  if (logoImg) {
+    const logoSize = 30;
+    const logoX = 10;
+    const logoY = 7;
+    
+    doc.setDrawColor(...goldColor);
+    doc.setLineWidth(2);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 2);
+    
+    doc.setFillColor(255, 255, 255);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 0.5, 'F');
+    
+    doc.addImage(logoImg, "PNG", logoX, logoY, logoSize, logoSize);
+  }
   
   // School name
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
+  doc.setFontSize(17);
   doc.setFont("helvetica", "bold");
-  doc.text(data.schoolName || "The Suffah Public School & College", 45, 18);
+  doc.text(data.schoolName || "The Suffah Public School & College", 47, 18);
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", 45, 27);
-  doc.text(`Phone: ${data.schoolPhone || "+92 000 000 0000"}`, 45, 35);
+  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", 47, 27);
+  doc.text(`Phone: ${data.schoolPhone || "+92 000 000 0000"}`, 47, 35);
   
   // Report title
   doc.setTextColor(...darkColor);
-  doc.setFontSize(18);
+  doc.setFontSize(17);
   doc.setFont("helvetica", "bold");
   doc.text("STUDENT FEE REPORT", pageWidth / 2, 60, { align: "center" });
   
-  // Student info card
+  // Student info card with gold border
   doc.setFillColor(250, 250, 252);
-  doc.roundedRect(15, 68, pageWidth - 30, 35, 3, 3, "F");
-  doc.setDrawColor(...primaryColor);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(15, 68, pageWidth - 30, 35, 3, 3, "S");
+  doc.roundedRect(15, 68, pageWidth - 30, 38, 4, 4, "F");
+  doc.setDrawColor(...goldColor);
+  doc.setLineWidth(1);
+  doc.roundedRect(15, 68, pageWidth - 30, 38, 4, 4, "S");
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
@@ -320,7 +331,7 @@ export const generateIndividualFeeReportPdf = async (data: IndividualFeeReportDa
   
   const col1X = 20;
   const col2X = 110;
-  let infoY = 85;
+  let infoY = 86;
   
   doc.setFont("helvetica", "bold");
   doc.text("Name:", col1X, infoY);
@@ -332,7 +343,7 @@ export const generateIndividualFeeReportPdf = async (data: IndividualFeeReportDa
   doc.setFont("helvetica", "normal");
   doc.text(data.className, col2X + 20, infoY);
   
-  infoY += 8;
+  infoY += 9;
   doc.setFont("helvetica", "bold");
   doc.text("Student ID:", col1X, infoY);
   doc.setFont("helvetica", "normal");
@@ -343,7 +354,7 @@ export const generateIndividualFeeReportPdf = async (data: IndividualFeeReportDa
   doc.setFont("helvetica", "normal");
   doc.text(data.rollNo, col2X + 23, infoY);
   
-  infoY += 8;
+  infoY += 9;
   if (data.fatherName) {
     doc.setFont("helvetica", "bold");
     doc.text("Father:", col1X, infoY);
@@ -356,12 +367,12 @@ export const generateIndividualFeeReportPdf = async (data: IndividualFeeReportDa
   doc.setFont("helvetica", "normal");
   doc.text(data.reportDate, col2X + 35, infoY);
   
-  // Summary stats
+  // Summary stats with circular design
   const totalFees = data.fees.reduce((sum, f) => sum + f.finalAmount, 0);
   const totalPaid = data.fees.reduce((sum, f) => sum + f.paidAmount, 0);
   const totalBalance = data.fees.reduce((sum, f) => sum + f.balance, 0);
   
-  const statsY = 112;
+  const statsY = 115;
   const statBoxWidth = (pageWidth - 50) / 3;
   
   const summaryStats = [
@@ -373,26 +384,29 @@ export const generateIndividualFeeReportPdf = async (data: IndividualFeeReportDa
   summaryStats.forEach((stat, index) => {
     const x = 20 + (statBoxWidth + 5) * index;
     doc.setFillColor(245, 247, 250);
-    doc.roundedRect(x, statsY, statBoxWidth, 18, 2, 2, "F");
+    doc.roundedRect(x, statsY, statBoxWidth, 20, 3, 3, "F");
+    doc.setDrawColor(...stat.color);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(x, statsY, statBoxWidth, 20, 3, 3, "S");
     
     doc.setFontSize(8);
     doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
-    doc.text(stat.label, x + statBoxWidth / 2, statsY + 6, { align: "center" });
+    doc.text(stat.label, x + statBoxWidth / 2, statsY + 7, { align: "center" });
     
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(stat.color[0], stat.color[1], stat.color[2]);
-    doc.text(stat.value, x + statBoxWidth / 2, statsY + 14, { align: "center" });
+    doc.setTextColor(stat.color[0] as number, stat.color[1] as number, stat.color[2] as number);
+    doc.text(stat.value, x + statBoxWidth / 2, statsY + 15, { align: "center" });
   });
   
   // Fee details table
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...primaryColor);
-  doc.text("FEE DETAILS", 20, 142);
+  doc.text("FEE DETAILS", 20, 146);
   
   autoTable(doc, {
-    startY: 146,
+    startY: 150,
     head: [["Fee Name", "Type", "Amount", "Discount", "Final", "Paid", "Balance", "Status"]],
     body: data.fees.map((fee) => [
       fee.feeName,
@@ -471,16 +485,8 @@ export const generateIndividualFeeReportPdf = async (data: IndividualFeeReportDa
     });
   }
   
-  // Footer
-  const pageHeight = doc.internal.pageSize.getHeight();
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.3);
-  doc.line(15, pageHeight - 20, pageWidth - 15, pageHeight - 20);
-  
-  doc.setFontSize(8);
-  doc.setTextColor(...grayColor);
-  doc.text("This is a computer-generated report and does not require a signature.", pageWidth / 2, pageHeight - 14, { align: "center" });
-  doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+  // Apply styled footer
+  drawStyledFooter(doc, 1, 1, data.schoolAddress || "Madyan Swat, Pakistan");
   
   return doc;
 };

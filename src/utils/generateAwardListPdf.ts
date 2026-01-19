@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { loadLogo, addWatermark, drawStyledFooter, primaryColor, goldColor, darkColor, grayColor } from './pdfDesignUtils';
 
 interface StudentInfo {
   sr_no: number;
@@ -31,70 +32,108 @@ export const generateAwardListPdf = async (data: AwardListData): Promise<jsPDF> 
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 10;
+  const logoImg = await loadLogo();
+  
+  // Add watermark
+  await addWatermark(doc);
 
-  // Load and add header image
-  try {
-    const headerImg = await loadImage('/images/school-header.png');
-    const imgWidth = pageWidth - margin * 2;
-    const imgHeight = 25;
-    doc.addImage(headerImg, 'PNG', margin, 5, imgWidth, imgHeight);
-  } catch (error) {
-    // Try to load and add logo if header fails
-    try {
-      const logoImg = await loadImage('/images/school-logo.png');
-      doc.addImage(logoImg, 'PNG', margin, 5, 22, 22);
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('The Suffah Public School & College', margin + 27, 15);
-      doc.setFontSize(10);
-      doc.text('PSRA Reg. No. 200445000302 | BISE Reg. No. 434-B/Swat-C', margin + 27, 22);
-      doc.text('Madyan Swat, Pakistan', margin + 27, 28);
-    } catch {
-      // Fallback text header if both images fail
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('The Suffah Public School & College', pageWidth / 2, 15, { align: 'center' });
-      doc.setFontSize(10);
-      doc.text('PSRA Reg. No. 200445000302 | BISE Reg. No. 434-B/Swat-C', pageWidth / 2, 22, { align: 'center' });
-    }
+  // Header background
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, pageWidth, 38, "F");
+  
+  // Gold accent stripe
+  doc.setFillColor(...goldColor);
+  doc.rect(0, 38, pageWidth, 2, "F");
+  
+  // Decorative circles in header
+  doc.setFillColor(255, 255, 255);
+  doc.circle(pageWidth - 18, 10, 22, 'F');
+  doc.circle(pageWidth - 40, -5, 15, 'F');
+  doc.circle(18, 30, 10, 'F');
+
+  // Circular logo with gold ring
+  if (logoImg) {
+    const logoSize = 26;
+    const logoX = margin;
+    const logoY = 6;
+    
+    doc.setDrawColor(...goldColor);
+    doc.setLineWidth(1.5);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 2);
+    
+    doc.setFillColor(255, 255, 255);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 0.5, 'F');
+    
+    doc.addImage(logoImg, "PNG", logoX, logoY, logoSize, logoSize);
   }
 
-  const startY = 38;
+  // School name
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('The Suffah Public School & College', pageWidth / 2 + 10, 14, { align: 'center' });
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('PSRA Reg. No. 200445000302 | BISE Reg. No. 434-B/Swat-C', pageWidth / 2 + 10, 22, { align: 'center' });
+  doc.text('Madyan Swat, Pakistan', pageWidth / 2 + 10, 28, { align: 'center' });
 
-  // Award List title box - centered
-  const titleWidth = 55;
+  const startY = 48;
+
+  // Award List title box with rounded corners
+  const titleWidth = 58;
   const titleX = pageWidth / 2 - titleWidth / 2;
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(0);
-  doc.rect(titleX, startY - 5, titleWidth, 8, 'FD');
+  doc.setFillColor(...primaryColor);
+  doc.roundedRect(titleX, startY - 6, titleWidth, 10, 5, 5, 'F');
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
   doc.text('Subject Wise Award-List', pageWidth / 2, startY, { align: 'center' });
 
-  // Row 1: Session, Date, Max Marks
-  const row1Y = startY + 10;
+  // Info rows with styled layout
+  const row1Y = startY + 14;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text(`Session: ${data.session}`, margin, row1Y);
-  doc.text(`Date: ${data.date}`, pageWidth / 2 - 20, row1Y);
-  doc.text(`Max Marks: ${data.maxMarks}`, pageWidth - margin - 40, row1Y);
+  doc.setTextColor(...darkColor);
+  
+  // Session box
+  doc.setFillColor(245, 247, 250);
+  doc.roundedRect(margin, row1Y - 5, 55, 8, 2, 2, 'F');
+  doc.text(`Session: ${data.session}`, margin + 3, row1Y);
+  
+  // Date box
+  doc.roundedRect(margin + 60, row1Y - 5, 55, 8, 2, 2, 'F');
+  doc.text(`Date: ${data.date}`, margin + 63, row1Y);
+  
+  // Max Marks box
+  doc.roundedRect(pageWidth - margin - 55, row1Y - 5, 55, 8, 2, 2, 'F');
+  doc.text(`Max Marks: ${data.maxMarks}`, pageWidth - margin - 52, row1Y);
 
   // Row 2: Class, Section
-  const row2Y = row1Y + 7;
-  doc.text(`Class: ${data.className}`, margin, row2Y);
-  doc.text(`Section: ${data.section || 'N/A'}`, pageWidth / 2 - 20, row2Y);
+  const row2Y = row1Y + 12;
+  doc.setFillColor(245, 247, 250);
+  doc.roundedRect(margin, row2Y - 5, 55, 8, 2, 2, 'F');
+  doc.text(`Class: ${data.className}`, margin + 3, row2Y);
+  
+  doc.roundedRect(margin + 60, row2Y - 5, 55, 8, 2, 2, 'F');
+  doc.text(`Section: ${data.section || 'N/A'}`, margin + 63, row2Y);
 
   // Row 3: Subject, Teacher Name
-  const row3Y = row2Y + 7;
-  doc.text(`Subject: ${data.subject}`, margin, row3Y);
-  doc.text(`Teacher: ${data.teacherName || 'N/A'}`, pageWidth / 2 - 20, row3Y);
+  const row3Y = row2Y + 12;
+  doc.setFillColor(245, 247, 250);
+  doc.roundedRect(margin, row3Y - 5, 85, 8, 2, 2, 'F');
+  doc.text(`Subject: ${data.subject}`, margin + 3, row3Y);
+  
+  doc.roundedRect(margin + 90, row3Y - 5, 85, 8, 2, 2, 'F');
+  doc.text(`Teacher: ${data.teacherName || 'N/A'}`, margin + 93, row3Y);
 
-  // Separator line
-  doc.setLineWidth(0.3);
-  doc.line(margin, row3Y + 4, pageWidth - margin, row3Y + 4);
+  // Separator line with gold accent
+  doc.setDrawColor(...goldColor);
+  doc.setLineWidth(1);
+  doc.line(margin, row3Y + 6, pageWidth - margin, row3Y + 6);
 
   // Table
-  const tableStartY = row3Y + 8;
+  const tableStartY = row3Y + 12;
 
   autoTable(doc, {
     startY: tableStartY,
@@ -124,8 +163,8 @@ export const generateAwardListPdf = async (data: AwardListData): Promise<jsPDF> 
       lineWidth: 0.3,
     },
     headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: [0, 0, 0],
+      fillColor: primaryColor,
+      textColor: [255, 255, 255],
       fontStyle: 'bold',
       lineWidth: 0.3,
     },
@@ -134,7 +173,7 @@ export const generateAwardListPdf = async (data: AwardListData): Promise<jsPDF> 
       textColor: [0, 0, 0],
     },
     alternateRowStyles: {
-      fillColor: [255, 255, 255],
+      fillColor: [250, 250, 252],
     },
     columnStyles: {
       0: { cellWidth: 12 },
@@ -147,28 +186,10 @@ export const generateAwardListPdf = async (data: AwardListData): Promise<jsPDF> 
     },
   });
 
-  return doc;
-};
+  // Apply styled footer
+  drawStyledFooter(doc, 1, 1, "Madyan Swat, Pakistan");
 
-const loadImage = (url: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      } else {
-        reject(new Error('Failed to get canvas context'));
-      }
-    };
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = url;
-  });
+  return doc;
 };
 
 export const downloadAwardList = async (data: AwardListData, filename: string) => {
