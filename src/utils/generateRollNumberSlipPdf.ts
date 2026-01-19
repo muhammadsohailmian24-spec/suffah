@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { loadLogo, addWatermark, drawStyledFooter, primaryColor, goldColor, darkColor, grayColor } from "./pdfDesignUtils";
 
 export interface RollNumberSlipData {
   studentName: string;
@@ -21,54 +22,65 @@ export interface RollNumberSlipData {
   schoolAddress?: string;
 }
 
-export const generateRollNumberSlipPdf = async (data: RollNumberSlipData) => {
-  const doc = new jsPDF();
+const generateSingleSlip = async (doc: jsPDF, data: RollNumberSlipData, logoImg: HTMLImageElement | null): Promise<void> => {
   const pageWidth = doc.internal.pageSize.getWidth();
   
-  // Colors - Royal Blue theme
-  const primaryColor: [number, number, number] = [30, 100, 180];
-  const darkColor: [number, number, number] = [30, 30, 30];
-  const grayColor: [number, number, number] = [100, 100, 100];
+  // Add watermark
+  await addWatermark(doc);
 
   // Header
   doc.setFillColor(...primaryColor);
-  doc.rect(0, 0, pageWidth, 40, "F");
+  doc.rect(0, 0, pageWidth, 42, "F");
+  
+  // Gold accent stripe
+  doc.setFillColor(...goldColor);
+  doc.rect(0, 42, pageWidth, 3, "F");
+  
+  // Decorative circles in header
+  doc.setFillColor(255, 255, 255);
+  doc.circle(pageWidth - 20, 12, 25, 'F');
+  doc.circle(pageWidth - 45, -5, 18, 'F');
+  doc.circle(20, 35, 12, 'F');
 
-  // Add logo (square aspect ratio)
-  try {
-    const logoImg = new Image();
-    logoImg.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      logoImg.onload = () => {
-        doc.addImage(logoImg, "PNG", 10, 5, 30, 30);
-        resolve();
-      };
-      logoImg.onerror = reject;
-      logoImg.src = "/images/school-logo.png";
-    });
-  } catch (e) {
-    // Continue without logo if it fails
+  // Circular logo with gold ring
+  if (logoImg) {
+    const logoSize = 30;
+    const logoX = 10;
+    const logoY = 6;
+    
+    doc.setDrawColor(...goldColor);
+    doc.setLineWidth(2);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 3);
+    
+    doc.setFillColor(255, 255, 255);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 1, 'F');
+    
+    doc.addImage(logoImg, "PNG", logoX, logoY, logoSize, logoSize);
   }
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
+  doc.setFontSize(17);
   doc.setFont("helvetica", "bold");
-  doc.text(data.schoolName || "The Suffah Public School & College", pageWidth / 2 + 10, 15, { align: "center" });
+  doc.text(data.schoolName || "The Suffah Public School & College", pageWidth / 2 + 12, 14, { align: "center" });
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", pageWidth / 2 + 10, 23, { align: "center" });
+  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", pageWidth / 2 + 12, 23, { align: "center" });
 
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
-  doc.text("EXAMINATION ROLL NUMBER SLIP", pageWidth / 2 + 10, 33, { align: "center" });
+  doc.text("EXAMINATION ROLL NUMBER SLIP", pageWidth / 2 + 12, 35, { align: "center" });
 
-  // Photo box (right side)
+  // Photo box (right side) with gold border
   const photoX = pageWidth - 50;
-  const photoY = 50;
+  const photoY = 52;
   const photoWidth = 30;
   const photoHeight = 40;
 
+  doc.setDrawColor(...goldColor);
+  doc.setLineWidth(1.5);
+  doc.roundedRect(photoX - 2, photoY - 2, photoWidth + 4, photoHeight + 4, 3, 3, "S");
+  
   doc.setDrawColor(...grayColor);
   doc.setLineWidth(0.5);
   doc.rect(photoX, photoY, photoWidth, photoHeight);
@@ -97,7 +109,7 @@ export const generateRollNumberSlipPdf = async (data: RollNumberSlipData) => {
   }
 
   // Student details (left side)
-  let yPos = 55;
+  let yPos = 57;
   const leftMargin = 20;
 
   doc.setTextColor(...darkColor);
@@ -120,8 +132,8 @@ export const generateRollNumberSlipPdf = async (data: RollNumberSlipData) => {
     yPos += 8;
   });
 
-  // Exam schedule table
-  yPos = 105;
+  // Exam schedule section header
+  yPos = 107;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(...primaryColor);
@@ -155,7 +167,7 @@ export const generateRollNumberSlipPdf = async (data: RollNumberSlipData) => {
     margin: { left: leftMargin, right: leftMargin },
   });
 
-  // Instructions
+  // Instructions with circular bullet points
   const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
   
   doc.setFontSize(10);
@@ -166,18 +178,22 @@ export const generateRollNumberSlipPdf = async (data: RollNumberSlipData) => {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   const instructions = [
-    "1. Bring this slip to the examination hall.",
-    "2. Students must be present 15 minutes before exam time.",
-    "3. No electronic devices are allowed in the examination hall.",
-    "4. Students should bring their own stationery.",
+    "Bring this slip to the examination hall.",
+    "Students must be present 15 minutes before exam time.",
+    "No electronic devices are allowed in the examination hall.",
+    "Students should bring their own stationery.",
   ];
 
   instructions.forEach((instruction, index) => {
-    doc.text(instruction, leftMargin, finalY + 8 + index * 6);
+    // Circular bullet
+    doc.setFillColor(...primaryColor);
+    doc.circle(leftMargin + 2, finalY + 6 + index * 6, 1.5, 'F');
+    doc.setTextColor(...darkColor);
+    doc.text(instruction, leftMargin + 8, finalY + 8 + index * 6);
   });
 
   // Footer with signatures
-  const footerY = doc.internal.pageSize.getHeight() - 30;
+  const footerY = doc.internal.pageSize.getHeight() - 32;
   
   doc.setLineWidth(0.5);
   doc.setDrawColor(...grayColor);
@@ -185,9 +201,18 @@ export const generateRollNumberSlipPdf = async (data: RollNumberSlipData) => {
   doc.line(pageWidth - leftMargin - 50, footerY, pageWidth - leftMargin, footerY);
 
   doc.setFontSize(9);
+  doc.setTextColor(...darkColor);
   doc.text("Principal's Signature", leftMargin, footerY + 6);
   doc.text("Controller of Examination", pageWidth - leftMargin - 50, footerY + 6);
+  
+  // Apply styled footer
+  drawStyledFooter(doc, 1, 1, data.schoolAddress || "Madyan Swat, Pakistan");
+};
 
+export const generateRollNumberSlipPdf = async (data: RollNumberSlipData) => {
+  const doc = new jsPDF();
+  const logoImg = await loadLogo();
+  await generateSingleSlip(doc, data, logoImg);
   return doc;
 };
 
@@ -197,168 +222,12 @@ export const downloadRollNumberSlip = async (data: RollNumberSlipData) => {
 };
 
 export const generateClassRollNumberSlips = async (students: RollNumberSlipData[]) => {
-  // Generate all in one doc
   const combinedDoc = new jsPDF();
-  const pageWidth = combinedDoc.internal.pageSize.getWidth();
-  // Colors - Royal Blue theme
-  const primaryColor: [number, number, number] = [30, 100, 180];
-  const darkColor: [number, number, number] = [30, 30, 30];
-  const grayColor: [number, number, number] = [100, 100, 100];
+  const logoImg = await loadLogo();
 
   for (let i = 0; i < students.length; i++) {
     if (i > 0) combinedDoc.addPage();
-    
-    const data = students[i];
-    
-    // Header
-    combinedDoc.setFillColor(...primaryColor);
-    combinedDoc.rect(0, 0, pageWidth, 40, "F");
-
-    // Add logo (square aspect ratio)
-    try {
-      const logoImg = new Image();
-      logoImg.crossOrigin = "anonymous";
-      await new Promise<void>((resolve, reject) => {
-        logoImg.onload = () => {
-          combinedDoc.addImage(logoImg, "PNG", 10, 5, 30, 30);
-          resolve();
-        };
-        logoImg.onerror = reject;
-        logoImg.src = "/images/school-logo.png";
-      });
-    } catch (e) {
-      // Continue without logo if it fails
-    }
-
-    combinedDoc.setTextColor(255, 255, 255);
-    combinedDoc.setFontSize(18);
-    combinedDoc.setFont("helvetica", "bold");
-    combinedDoc.text(data.schoolName || "The Suffah Public School & College", pageWidth / 2 + 10, 15, { align: "center" });
-
-    combinedDoc.setFontSize(10);
-    combinedDoc.setFont("helvetica", "normal");
-    combinedDoc.text(data.schoolAddress || "Madyan Swat, Pakistan", pageWidth / 2 + 10, 23, { align: "center" });
-
-    combinedDoc.setFontSize(12);
-    combinedDoc.setFont("helvetica", "bold");
-    combinedDoc.text("EXAMINATION ROLL NUMBER SLIP", pageWidth / 2 + 10, 33, { align: "center" });
-
-    // Photo box
-    const photoX = pageWidth - 50;
-    const photoY = 50;
-    const photoWidth = 30;
-    const photoHeight = 40;
-
-    combinedDoc.setDrawColor(...grayColor);
-    combinedDoc.setLineWidth(0.5);
-    combinedDoc.rect(photoX, photoY, photoWidth, photoHeight);
-
-    if (data.photoUrl) {
-      try {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        await new Promise<void>((resolve, reject) => {
-          img.onload = () => {
-            combinedDoc.addImage(img, "JPEG", photoX, photoY, photoWidth, photoHeight);
-            resolve();
-          };
-          img.onerror = reject;
-          img.src = data.photoUrl!;
-        });
-      } catch (e) {
-        combinedDoc.setFontSize(8);
-        combinedDoc.setTextColor(...grayColor);
-        combinedDoc.text("Photo", photoX + photoWidth / 2, photoY + photoHeight / 2, { align: "center" });
-      }
-    } else {
-      combinedDoc.setFontSize(8);
-      combinedDoc.setTextColor(...grayColor);
-      combinedDoc.text("Photo", photoX + photoWidth / 2, photoY + photoHeight / 2, { align: "center" });
-    }
-
-    // Student details
-    let yPos = 55;
-    const leftMargin = 20;
-
-    combinedDoc.setTextColor(...darkColor);
-    combinedDoc.setFontSize(11);
-
-    const details = [
-      { label: "Student Name:", value: data.studentName },
-      { label: "Father's Name:", value: data.fatherName || "-" },
-      { label: "Student ID:", value: data.studentId },
-      { label: "Roll Number:", value: data.rollNumber || data.studentId },
-      { label: "Class:", value: `${data.className}${data.section ? ` - ${data.section}` : ""}` },
-      { label: "Examination:", value: data.examName },
-    ];
-
-    details.forEach((detail) => {
-      combinedDoc.setFont("helvetica", "bold");
-      combinedDoc.text(detail.label, leftMargin, yPos);
-      combinedDoc.setFont("helvetica", "normal");
-      combinedDoc.text(detail.value, leftMargin + 40, yPos);
-      yPos += 8;
-    });
-
-    // Exam schedule
-    yPos = 105;
-    combinedDoc.setFont("helvetica", "bold");
-    combinedDoc.setFontSize(12);
-    combinedDoc.setTextColor(...primaryColor);
-    combinedDoc.text("EXAMINATION SCHEDULE", leftMargin, yPos);
-
-    autoTable(combinedDoc, {
-      startY: yPos + 5,
-      head: [["S.No", "Subject", "Date", "Time"]],
-      body: data.subjects.map((sub, index) => [
-        String(index + 1),
-        sub.name,
-        sub.date,
-        sub.time || "-",
-      ]),
-      headStyles: {
-        fillColor: primaryColor,
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        fontSize: 10,
-      },
-      bodyStyles: {
-        fontSize: 10,
-        textColor: darkColor,
-      },
-      margin: { left: leftMargin, right: leftMargin },
-    });
-
-    // Instructions
-    const finalY = (combinedDoc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
-    
-    combinedDoc.setFontSize(10);
-    combinedDoc.setFont("helvetica", "bold");
-    combinedDoc.setTextColor(...darkColor);
-    combinedDoc.text("INSTRUCTIONS:", leftMargin, finalY);
-
-    combinedDoc.setFont("helvetica", "normal");
-    combinedDoc.setFontSize(9);
-    const instructions = [
-      "1. Bring this slip to the examination hall.",
-      "2. Students must be present 15 minutes before exam time.",
-      "3. No electronic devices are allowed in the examination hall.",
-    ];
-
-    instructions.forEach((instruction, index) => {
-      combinedDoc.text(instruction, leftMargin, finalY + 8 + index * 6);
-    });
-
-    // Footer
-    const footerY = combinedDoc.internal.pageSize.getHeight() - 30;
-    combinedDoc.setLineWidth(0.5);
-    combinedDoc.setDrawColor(...grayColor);
-    combinedDoc.line(leftMargin, footerY, leftMargin + 50, footerY);
-    combinedDoc.line(pageWidth - leftMargin - 50, footerY, pageWidth - leftMargin, footerY);
-    combinedDoc.setFontSize(9);
-    combinedDoc.setTextColor(...darkColor);
-    combinedDoc.text("Principal's Signature", leftMargin, footerY + 6);
-    combinedDoc.text("Controller of Examination", pageWidth - leftMargin - 50, footerY + 6);
+    await generateSingleSlip(combinedDoc, students[i], logoImg);
   }
 
   return combinedDoc;

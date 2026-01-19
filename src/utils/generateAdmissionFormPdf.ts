@@ -1,5 +1,5 @@
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { loadLogo, addWatermark, drawStyledFooter, primaryColor, goldColor, darkColor, grayColor, lightGray } from "./pdfDesignUtils";
 
 export interface AdmissionFormData {
   studentName: string;
@@ -25,52 +25,65 @@ export interface AdmissionFormData {
 export const generateAdmissionFormPdf = async (data: AdmissionFormData) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const logoImg = await loadLogo();
   
-  // Colors - Royal Blue theme
-  const primaryColor: [number, number, number] = [30, 100, 180];
-  const darkColor: [number, number, number] = [30, 30, 30];
-  const grayColor: [number, number, number] = [100, 100, 100];
-  const lightGray: [number, number, number] = [240, 240, 240];
+  // Add watermark
+  await addWatermark(doc);
 
   // Header
   doc.setFillColor(...primaryColor);
-  doc.rect(0, 0, pageWidth, 40, "F");
+  doc.rect(0, 0, pageWidth, 42, "F");
+  
+  // Gold accent stripe
+  doc.setFillColor(...goldColor);
+  doc.rect(0, 42, pageWidth, 3, "F");
+  
+  // Decorative circles in header
+  doc.setFillColor(255, 255, 255);
+  doc.circle(pageWidth - 20, 12, 25, 'F');
+  doc.circle(pageWidth - 45, -5, 18, 'F');
+  doc.circle(20, 35, 12, 'F');
 
-  // Add logo (square aspect ratio)
-  try {
-    const logoImg = new Image();
-    logoImg.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      logoImg.onload = () => {
-        doc.addImage(logoImg, "PNG", 10, 5, 30, 30);
-        resolve();
-      };
-      logoImg.onerror = reject;
-      logoImg.src = "/images/school-logo.png";
-    });
-  } catch (e) {
-    // Continue without logo if it fails
+  // Circular logo with gold ring
+  if (logoImg) {
+    const logoSize = 30;
+    const logoX = 10;
+    const logoY = 6;
+    
+    doc.setDrawColor(...goldColor);
+    doc.setLineWidth(2);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 3);
+    
+    doc.setFillColor(255, 255, 255);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 1, 'F');
+    
+    doc.addImage(logoImg, "PNG", logoX, logoY, logoSize, logoSize);
   }
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
+  doc.setFontSize(17);
   doc.setFont("helvetica", "bold");
-  doc.text(data.schoolName || "The Suffah Public School & College", pageWidth / 2 + 10, 15, { align: "center" });
+  doc.text(data.schoolName || "The Suffah Public School & College", pageWidth / 2 + 12, 15, { align: "center" });
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", pageWidth / 2 + 10, 23, { align: "center" });
+  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", pageWidth / 2 + 12, 24, { align: "center" });
 
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
-  doc.text("ADMISSION FORM", pageWidth / 2 + 10, 33, { align: "center" });
+  doc.text("ADMISSION FORM", pageWidth / 2 + 12, 35, { align: "center" });
 
-  // Photo box (right side)
+  // Photo box (right side) - circular design
   const photoX = pageWidth - 50;
-  const photoY = 50;
+  const photoY = 52;
   const photoWidth = 35;
   const photoHeight = 45;
 
+  // Photo border with gold ring effect
+  doc.setDrawColor(...goldColor);
+  doc.setLineWidth(1.5);
+  doc.roundedRect(photoX - 2, photoY - 2, photoWidth + 4, photoHeight + 4, 3, 3, "S");
+  
   doc.setDrawColor(...grayColor);
   doc.setLineWidth(0.5);
   doc.rect(photoX, photoY, photoWidth, photoHeight);
@@ -99,11 +112,11 @@ export const generateAdmissionFormPdf = async (data: AdmissionFormData) => {
   }
 
   const leftMargin = 15;
-  let yPos = 50;
+  let yPos = 52;
 
   // Student Information Section
   doc.setFillColor(...lightGray);
-  doc.rect(leftMargin, yPos, pageWidth - leftMargin * 2 - 50, 10, "F");
+  doc.roundedRect(leftMargin, yPos, pageWidth - leftMargin * 2 - 50, 10, 2, 2, "F");
   doc.setTextColor(...primaryColor);
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
@@ -138,7 +151,7 @@ export const generateAdmissionFormPdf = async (data: AdmissionFormData) => {
 
   // Father/Guardian Information Section
   doc.setFillColor(...lightGray);
-  doc.rect(leftMargin, yPos, pageWidth - leftMargin * 2, 10, "F");
+  doc.roundedRect(leftMargin, yPos, pageWidth - leftMargin * 2, 10, 2, 2, "F");
   doc.setTextColor(...primaryColor);
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
@@ -172,7 +185,7 @@ export const generateAdmissionFormPdf = async (data: AdmissionFormData) => {
 
   // Address & Education Section
   doc.setFillColor(...lightGray);
-  doc.rect(leftMargin, yPos, pageWidth - leftMargin * 2, 10, "F");
+  doc.roundedRect(leftMargin, yPos, pageWidth - leftMargin * 2, 10, 2, 2, "F");
   doc.setTextColor(...primaryColor);
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
@@ -196,35 +209,43 @@ export const generateAdmissionFormPdf = async (data: AdmissionFormData) => {
 
   yPos += 20;
 
-  // Login Credentials Section
+  // Login Credentials Section with circular accent
   doc.setFillColor(220, 235, 255);
-  doc.rect(leftMargin, yPos, pageWidth - leftMargin * 2, 30, "F");
+  doc.roundedRect(leftMargin, yPos, pageWidth - leftMargin * 2, 32, 3, 3, "F");
   doc.setDrawColor(...primaryColor);
-  doc.setLineWidth(1);
-  doc.rect(leftMargin, yPos, pageWidth - leftMargin * 2, 30, "S");
+  doc.setLineWidth(1.5);
+  doc.roundedRect(leftMargin, yPos, pageWidth - leftMargin * 2, 32, 3, 3, "S");
+  
+  // Circular icon
+  doc.setFillColor(...primaryColor);
+  doc.circle(leftMargin + 12, yPos + 16, 8, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("ID", leftMargin + 12, yPos + 18, { align: "center" });
   
   doc.setTextColor(...primaryColor);
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
-  doc.text("STUDENT LOGIN CREDENTIALS", leftMargin + 3, yPos + 8);
+  doc.text("STUDENT LOGIN CREDENTIALS", leftMargin + 25, yPos + 10);
   
   doc.setTextColor(...darkColor);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("Student ID (Username):", leftMargin + 3, yPos + 18);
+  doc.text("Student ID (Username):", leftMargin + 25, yPos + 20);
   doc.setFont("helvetica", "normal");
-  doc.text(data.studentId, leftMargin + 55, yPos + 18);
+  doc.text(data.studentId, leftMargin + 75, yPos + 20);
   
   doc.setFont("helvetica", "bold");
-  doc.text("Password:", leftMargin + 3, yPos + 26);
+  doc.text("Password:", leftMargin + 25, yPos + 28);
   doc.setFont("helvetica", "normal");
-  doc.text("(As provided during registration)", leftMargin + 28, yPos + 26);
+  doc.text("(As provided during registration)", leftMargin + 52, yPos + 28);
 
-  yPos += 40;
+  yPos += 42;
 
   // Documents Checklist
   doc.setFillColor(...lightGray);
-  doc.rect(leftMargin, yPos, pageWidth - leftMargin * 2, 10, "F");
+  doc.roundedRect(leftMargin, yPos, pageWidth - leftMargin * 2, 10, 2, 2, "F");
   doc.setTextColor(...primaryColor);
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
@@ -255,23 +276,25 @@ export const generateAdmissionFormPdf = async (data: AdmissionFormData) => {
   doc.setLineWidth(0.5);
   doc.setDrawColor(...grayColor);
   
-  // Three signature lines
+  // Three signature lines with circular markers
   const sigWidth = 50;
   const gap = (pageWidth - 2 * leftMargin - 3 * sigWidth) / 2;
   
-  doc.line(leftMargin, footerY, leftMargin + sigWidth, footerY);
-  doc.line(leftMargin + sigWidth + gap, footerY, leftMargin + 2 * sigWidth + gap, footerY);
-  doc.line(leftMargin + 2 * sigWidth + 2 * gap, footerY, leftMargin + 3 * sigWidth + 2 * gap, footerY);
+  // Signature line markers
+  const sigPositions = [leftMargin, leftMargin + sigWidth + gap, leftMargin + 2 * sigWidth + 2 * gap];
+  const sigLabels = ["Parent/Guardian Signature", "Admission Officer", "Principal"];
+  
+  sigPositions.forEach((x, i) => {
+    doc.setFillColor(...primaryColor);
+    doc.circle(x + sigWidth / 2, footerY - 5, 3, 'F');
+    doc.line(x, footerY, x + sigWidth, footerY);
+    doc.setFontSize(8);
+    doc.setTextColor(...darkColor);
+    doc.text(sigLabels[i], x, footerY + 5);
+  });
 
-  doc.setFontSize(8);
-  doc.setTextColor(...darkColor);
-  doc.text("Parent/Guardian Signature", leftMargin, footerY + 5);
-  doc.text("Admission Officer", leftMargin + sigWidth + gap, footerY + 5);
-  doc.text("Principal", leftMargin + 2 * sigWidth + 2 * gap, footerY + 5);
-
-  // Date at bottom
-  doc.setFontSize(8);
-  doc.text(`Form Generated: ${new Date().toLocaleDateString()}`, leftMargin, doc.internal.pageSize.getHeight() - 10);
+  // Apply styled footer
+  drawStyledFooter(doc, 1, 1, data.schoolAddress || "Madyan Swat, Pakistan");
 
   return doc;
 };

@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { loadLogo, addWatermark, addCircularDecorations, drawStyledFooter, primaryColor, goldColor, darkColor, grayColor } from "./pdfDesignUtils";
 
 export interface ReceiptData {
   receiptNumber: string;
@@ -24,95 +25,109 @@ export interface ReceiptData {
 export const generateReceiptPdf = async (data: ReceiptData) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const logoImg = await loadLogo();
   
-  // Colors - Royal Blue theme
-  const primaryColor: [number, number, number] = [30, 100, 180];
-  const darkColor: [number, number, number] = [30, 30, 30];
-  const grayColor: [number, number, number] = [100, 100, 100];
+  // Add watermark first (behind everything)
+  await addWatermark(doc);
   
   // Header background
   doc.setFillColor(...primaryColor);
   doc.rect(0, 0, pageWidth, 50, "F");
   
-  // Add logo (square aspect ratio)
-  try {
-    const logoImg = new Image();
-    logoImg.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      logoImg.onload = () => {
-        doc.addImage(logoImg, "PNG", 10, 8, 34, 34);
-        resolve();
-      };
-      logoImg.onerror = reject;
-      logoImg.src = "/images/school-logo.png";
-    });
-  } catch (e) {
-    // Continue without logo if it fails
+  // Gold accent stripe
+  doc.setFillColor(...goldColor);
+  doc.rect(0, 50, pageWidth, 3, "F");
+  
+  // Decorative circles in header
+  doc.setFillColor(255, 255, 255);
+  doc.circle(pageWidth - 20, 15, 30, 'F');
+  doc.circle(pageWidth - 50, -5, 20, 'F');
+  doc.circle(25, 40, 15, 'F');
+  
+  // Circular logo container with gold ring
+  if (logoImg) {
+    const logoSize = 34;
+    const logoX = 10;
+    const logoY = 8;
+    
+    // Gold ring around logo
+    doc.setDrawColor(...goldColor);
+    doc.setLineWidth(2);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 3);
+    
+    // White circle background
+    doc.setFillColor(255, 255, 255);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 1, 'F');
+    
+    doc.addImage(logoImg, "PNG", logoX, logoY, logoSize, logoSize);
   }
   
   // School name
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(22);
+  doc.setFontSize(20);
   doc.setFont("helvetica", "bold");
-  doc.text(data.schoolName || "The Suffah Public School & College", 50, 20);
+  doc.text(data.schoolName || "The Suffah Public School & College", 52, 20);
   
   // School info
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", 50, 28);
-  doc.text(`Phone: ${data.schoolPhone || "+92 000 000 0000"} | Email: ${data.schoolEmail || "info@suffah.edu.pk"}`, 50, 36);
+  doc.text(data.schoolAddress || "Madyan Swat, Pakistan", 52, 28);
+  doc.text(`Phone: ${data.schoolPhone || "+92 000 000 0000"} | Email: ${data.schoolEmail || "info@suffah.edu.pk"}`, 52, 36);
   
   // Receipt title
   doc.setTextColor(...darkColor);
-  doc.setFontSize(28);
+  doc.setFontSize(26);
   doc.setFont("helvetica", "bold");
-  doc.text("PAYMENT RECEIPT", pageWidth - 20, 70, { align: "right" });
+  doc.text("PAYMENT RECEIPT", pageWidth - 20, 72, { align: "right" });
   
-  // Receipt details box
+  // Receipt details box with rounded corners
   doc.setFillColor(235, 245, 255);
-  doc.rect(pageWidth - 90, 75, 70, 28, "F");
+  doc.roundedRect(pageWidth - 92, 78, 72, 30, 3, 3, "F");
+  doc.setDrawColor(...primaryColor);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(pageWidth - 92, 78, 72, 30, 3, 3, "S");
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...grayColor);
-  doc.text("Receipt Number:", pageWidth - 85, 85);
-  doc.text("Payment Date:", pageWidth - 85, 93);
+  doc.text("Receipt Number:", pageWidth - 87, 88);
+  doc.text("Payment Date:", pageWidth - 87, 96);
   
   doc.setTextColor(...darkColor);
   doc.setFont("helvetica", "bold");
-  doc.text(data.receiptNumber, pageWidth - 25, 85, { align: "right" });
-  doc.text(data.paymentDate, pageWidth - 25, 93, { align: "right" });
+  doc.text(data.receiptNumber, pageWidth - 25, 88, { align: "right" });
+  doc.text(data.paymentDate, pageWidth - 25, 96, { align: "right" });
   
   // Received From section
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...primaryColor);
-  doc.text("RECEIVED FROM", 20, 80);
+  doc.text("RECEIVED FROM", 20, 82);
   
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...darkColor);
-  doc.text(data.studentName, 20, 90);
+  doc.text(data.studentName, 20, 92);
   
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(...grayColor);
-  doc.text(`Student ID: ${data.studentId}`, 20, 97);
+  doc.text(`Student ID: ${data.studentId}`, 20, 99);
   if (data.className) {
-    doc.text(`Class: ${data.className}`, 20, 104);
+    doc.text(`Class: ${data.className}`, 20, 106);
   }
   
-  // Payment confirmation badge
+  // Payment confirmation badge with circular design
   doc.setFillColor(...primaryColor);
-  doc.roundedRect(20, 115, 50, 12, 2, 2, "F");
+  doc.roundedRect(20, 115, 55, 14, 7, 7, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("PAYMENT CONFIRMED", 45, 123, { align: "center" });
+  doc.text("PAYMENT CONFIRMED", 47.5, 124, { align: "center" });
   
   // Payment details table
   autoTable(doc, {
-    startY: 140,
+    startY: 142,
     head: [["Description", "Fee Type", "Payment Method", "Amount Paid"]],
     body: [
       [
@@ -144,47 +159,50 @@ export const generateReceiptPdf = async (data: ReceiptData) => {
   // Summary section
   const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
   
-  // Summary box
+  // Summary box with gold accent
   doc.setFillColor(245, 247, 250);
-  doc.rect(pageWidth - 95, finalY, 75, 50, "F");
+  doc.roundedRect(pageWidth - 97, finalY, 77, 52, 3, 3, "F");
+  doc.setDrawColor(...goldColor);
+  doc.setLineWidth(1);
+  doc.roundedRect(pageWidth - 97, finalY, 77, 52, 3, 3, "S");
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...grayColor);
   
   let yPos = finalY + 12;
-  doc.text("Total Fee Amount:", pageWidth - 90, yPos);
+  doc.text("Total Fee Amount:", pageWidth - 92, yPos);
   doc.setTextColor(...darkColor);
   doc.text(`PKR ${data.totalFeeAmount.toLocaleString()}`, pageWidth - 25, yPos, { align: "right" });
   
   yPos += 10;
   doc.setTextColor(...grayColor);
-  doc.text("Previously Paid:", pageWidth - 90, yPos);
+  doc.text("Previously Paid:", pageWidth - 92, yPos);
   doc.setTextColor(...darkColor);
   doc.text(`PKR ${data.previouslyPaid.toLocaleString()}`, pageWidth - 25, yPos, { align: "right" });
   
   yPos += 10;
   doc.setTextColor(...grayColor);
-  doc.text("This Payment:", pageWidth - 90, yPos);
-  doc.setTextColor(30, 100, 180);
+  doc.text("This Payment:", pageWidth - 92, yPos);
+  doc.setTextColor(...primaryColor);
   doc.setFont("helvetica", "bold");
   doc.text(`PKR ${data.paymentAmount.toLocaleString()}`, pageWidth - 25, yPos, { align: "right" });
   
   // Balance due line
-  yPos += 12;
-  doc.setDrawColor(...primaryColor);
-  doc.setLineWidth(0.5);
-  doc.line(pageWidth - 90, yPos - 4, pageWidth - 25, yPos - 4);
+  yPos += 14;
+  doc.setDrawColor(...goldColor);
+  doc.setLineWidth(1);
+  doc.line(pageWidth - 92, yPos - 4, pageWidth - 25, yPos - 4);
   
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   if (data.balanceAfterPayment <= 0) {
-    doc.setTextColor(30, 100, 180);
-    doc.text("FULLY PAID", pageWidth - 90, yPos);
+    doc.setTextColor(34, 139, 34);
+    doc.text("FULLY PAID", pageWidth - 92, yPos);
     doc.text("PKR 0", pageWidth - 25, yPos, { align: "right" });
   } else {
     doc.setTextColor(234, 179, 8);
-    doc.text("Balance Due:", pageWidth - 90, yPos);
+    doc.text("Balance Due:", pageWidth - 92, yPos);
     doc.text(`PKR ${data.balanceAfterPayment.toLocaleString()}`, pageWidth - 25, yPos, { align: "right" });
   }
   
@@ -196,18 +214,8 @@ export const generateReceiptPdf = async (data: ReceiptData) => {
     doc.text(`Transaction ID: ${data.transactionId}`, 20, finalY + 10);
   }
   
-  // Footer
-  const footerY = doc.internal.pageSize.getHeight() - 35;
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.3);
-  doc.line(20, footerY, pageWidth - 20, footerY);
-  
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...grayColor);
-  doc.text("This is a computer-generated receipt and does not require a signature.", pageWidth / 2, footerY + 8, { align: "center" });
-  doc.text("Thank you for your payment!", pageWidth / 2, footerY + 15, { align: "center" });
-  doc.text("For any queries, please contact the school administration.", pageWidth / 2, footerY + 22, { align: "center" });
+  // Apply footer
+  drawStyledFooter(doc, 1, 1, data.schoolAddress || "Madyan Swat, Pakistan");
   
   return doc;
 };

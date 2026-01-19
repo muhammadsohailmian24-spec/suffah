@@ -1,13 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { format, getDaysInMonth, startOfMonth, eachDayOfInterval, endOfMonth } from "date-fns";
-
-// Colors - Royal Blue theme (matching school branding)
-const primaryColor: [number, number, number] = [30, 100, 180];
-const goldColor: [number, number, number] = [180, 140, 50];
-const darkColor: [number, number, number] = [30, 30, 30];
-const grayColor: [number, number, number] = [100, 100, 100];
-const lightGray: [number, number, number] = [240, 240, 240];
+import { format, eachDayOfInterval, startOfMonth, endOfMonth } from "date-fns";
+import { loadLogo, addWatermark, drawStyledFooter, primaryColor, goldColor, darkColor, grayColor, lightGray } from "./pdfDesignUtils";
 
 interface AttendanceRecord {
   date: string;
@@ -45,85 +39,6 @@ interface IndividualAttendanceData {
   schoolAddress?: string;
 }
 
-const loadLogo = async (): Promise<HTMLImageElement | null> => {
-  try {
-    const logoImg = new Image();
-    logoImg.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      logoImg.onload = () => resolve();
-      logoImg.onerror = reject;
-      logoImg.src = "/images/school-logo.png";
-    });
-    return logoImg;
-  } catch (e) {
-    return null;
-  }
-};
-
-const drawHeader = (doc: jsPDF, logoImg: HTMLImageElement | null, title: string, subtitle: string, schoolName: string, schoolAddress: string) => {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  
-  // Header background
-  doc.setFillColor(...primaryColor);
-  doc.rect(0, 0, pageWidth, 45, "F");
-  
-  // Gold accent line
-  doc.setFillColor(...goldColor);
-  doc.rect(0, 45, pageWidth, 3, "F");
-
-  // Add logo
-  if (logoImg) {
-    doc.addImage(logoImg, "PNG", 12, 7, 32, 32);
-  }
-
-  // School name
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
-  doc.setFont("helvetica", "bold");
-  doc.text(schoolName, pageWidth / 2 + 10, 16, { align: "center" });
-
-  // School address
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(schoolAddress, pageWidth / 2 + 10, 24, { align: "center" });
-
-  // Title
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.text(title, pageWidth / 2 + 10, 34, { align: "center" });
-
-  // Subtitle (month/class info)
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(subtitle, pageWidth / 2 + 10, 42, { align: "center" });
-};
-
-const drawFooter = (doc: jsPDF, pageNumber: number, totalPages: number) => {
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  
-  // Footer line
-  doc.setDrawColor(...grayColor);
-  doc.setLineWidth(0.5);
-  doc.line(15, pageHeight - 20, pageWidth - 15, pageHeight - 20);
-  
-  // Page number
-  doc.setFontSize(8);
-  doc.setTextColor(...grayColor);
-  doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth / 2, pageHeight - 12, { align: "center" });
-  
-  // Print date
-  doc.text(`Generated on: ${format(new Date(), "PPP 'at' p")}`, 15, pageHeight - 12);
-  
-  // Signature lines
-  doc.setFontSize(9);
-  doc.setTextColor(...darkColor);
-  doc.line(15, pageHeight - 30, 55, pageHeight - 30);
-  doc.line(pageWidth - 55, pageHeight - 30, pageWidth - 15, pageHeight - 30);
-  doc.text("Class Teacher", 25, pageHeight - 25);
-  doc.text("Principal", pageWidth - 45, pageHeight - 25);
-};
-
 const getStatusSymbol = (status: string): string => {
   switch (status.toLowerCase()) {
     case "present": return "P";
@@ -136,10 +51,10 @@ const getStatusSymbol = (status: string): string => {
 
 const getStatusColor = (status: string): [number, number, number] => {
   switch (status.toLowerCase()) {
-    case "present": return [34, 139, 34]; // Green
-    case "absent": return [220, 53, 69]; // Red
-    case "late": return [255, 165, 0]; // Orange
-    case "excused": return [70, 130, 180]; // Steel blue
+    case "present": return [34, 139, 34];
+    case "absent": return [220, 53, 69];
+    case "late": return [255, 165, 0];
+    case "excused": return [70, 130, 180];
     default: return grayColor;
   }
 };
@@ -157,16 +72,61 @@ export const generateClassMonthlyAttendancePdf = async (data: ClassAttendanceDat
   const schoolAddress = data.schoolAddress || "Madyan Swat, Pakistan";
   const classTitle = `${data.className}${data.section ? ` - ${data.section}` : ""}`;
   
-  drawHeader(
-    doc, 
-    logoImg, 
-    "MONTHLY ATTENDANCE REGISTER", 
-    `Class: ${classTitle} | Month: ${format(data.month, "MMMM yyyy")}`,
-    schoolName,
-    schoolAddress
-  );
+  // Add watermark
+  await addWatermark(doc);
+  
+  // Header background
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, pageWidth, 42, "F");
+  
+  // Gold accent stripe
+  doc.setFillColor(...goldColor);
+  doc.rect(0, 42, pageWidth, 2, "F");
+  
+  // Decorative circles in header
+  doc.setFillColor(255, 255, 255);
+  doc.circle(pageWidth - 25, 12, 28, 'F');
+  doc.circle(pageWidth - 55, -8, 20, 'F');
+  doc.circle(30, 32, 15, 'F');
+  
+  // Circular logo with gold ring
+  if (logoImg) {
+    const logoSize = 30;
+    const logoX = 12;
+    const logoY = 6;
+    
+    doc.setDrawColor(...goldColor);
+    doc.setLineWidth(2);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 2);
+    
+    doc.setFillColor(255, 255, 255);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 0.5, 'F');
+    
+    doc.addImage(logoImg, "PNG", logoX, logoY, logoSize, logoSize);
+  }
 
-  // Create table headers - days of the month
+  // School name
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(17);
+  doc.setFont("helvetica", "bold");
+  doc.text(schoolName, pageWidth / 2 + 12, 14, { align: "center" });
+
+  // School address
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(schoolAddress, pageWidth / 2 + 12, 23, { align: "center" });
+
+  // Title
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.text("MONTHLY ATTENDANCE REGISTER", pageWidth / 2 + 12, 33, { align: "center" });
+
+  // Subtitle
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Class: ${classTitle} | Month: ${format(data.month, "MMMM yyyy")}`, pageWidth / 2 + 12, 40, { align: "center" });
+
+  // Create table headers
   const dayHeaders = daysInMonth.map(day => format(day, "d"));
   const headers = ["#", "Roll No.", "Student Name", "Father Name", ...dayHeaders, "P", "A", "L", "E", "%"];
 
@@ -209,7 +169,7 @@ export const generateClassMonthlyAttendancePdf = async (data: ClassAttendanceDat
   });
 
   autoTable(doc, {
-    startY: 55,
+    startY: 50,
     head: [headers],
     body: tableBody,
     headStyles: {
@@ -237,7 +197,6 @@ export const generateClassMonthlyAttendancePdf = async (data: ClassAttendanceDat
     },
     margin: { left: 8, right: 8 },
     didParseCell: (hookData) => {
-      // Color code attendance cells
       if (hookData.section === "body" && hookData.column.index >= 4 && hookData.column.index < 4 + daysInMonth.length) {
         const cellText = hookData.cell.text[0];
         if (cellText === "P") hookData.cell.styles.textColor = [34, 139, 34];
@@ -245,7 +204,6 @@ export const generateClassMonthlyAttendancePdf = async (data: ClassAttendanceDat
         else if (cellText === "L") hookData.cell.styles.textColor = [255, 165, 0];
         else if (cellText === "E") hookData.cell.styles.textColor = [70, 130, 180];
       }
-      // Style the percentage column
       if (hookData.section === "body" && hookData.column.index === headers.length - 1) {
         const percentage = parseInt(hookData.cell.text[0]);
         if (percentage >= 90) hookData.cell.styles.textColor = [34, 139, 34];
@@ -256,14 +214,13 @@ export const generateClassMonthlyAttendancePdf = async (data: ClassAttendanceDat
     },
   });
 
-  // Add legend
+  // Legend with circular markers
   const finalY = (doc as any).lastAutoTable.finalY + 10;
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...darkColor);
   doc.text("Legend:", 10, finalY);
   
-  doc.setFont("helvetica", "normal");
   const legendItems = [
     { symbol: "P", label: "Present", color: [34, 139, 34] as [number, number, number] },
     { symbol: "A", label: "Absent", color: [220, 53, 69] as [number, number, number] },
@@ -271,11 +228,15 @@ export const generateClassMonthlyAttendancePdf = async (data: ClassAttendanceDat
     { symbol: "E", label: "Excused", color: [70, 130, 180] as [number, number, number] },
   ];
   
-  let legendX = 30;
+  let legendX = 28;
   legendItems.forEach(item => {
+    // Circular marker
+    doc.setFillColor(...item.color);
+    doc.circle(legendX, finalY - 1.5, 2, 'F');
+    doc.setFont("helvetica", "normal");
     doc.setTextColor(...item.color);
-    doc.text(`${item.symbol} = ${item.label}`, legendX, finalY);
-    legendX += 35;
+    doc.text(`${item.symbol} = ${item.label}`, legendX + 5, finalY);
+    legendX += 38;
   });
 
   // Summary
@@ -283,10 +244,11 @@ export const generateClassMonthlyAttendancePdf = async (data: ClassAttendanceDat
   doc.setFont("helvetica", "bold");
   doc.text(`Total Students: ${data.students.length}`, pageWidth - 60, finalY);
 
+  // Apply styled footer
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    drawFooter(doc, i, totalPages);
+    drawStyledFooter(doc, i, totalPages, schoolAddress);
   }
 
   return doc;
@@ -305,20 +267,66 @@ export const generateIndividualMonthlyAttendancePdf = async (data: IndividualAtt
   const schoolAddress = data.schoolAddress || "Madyan Swat, Pakistan";
   const classTitle = `${data.className}${data.section ? ` - ${data.section}` : ""}`;
   
-  drawHeader(
-    doc, 
-    logoImg, 
-    "MONTHLY ATTENDANCE REPORT", 
-    `Month: ${format(data.month, "MMMM yyyy")}`,
-    schoolName,
-    schoolAddress
-  );
+  // Add watermark
+  await addWatermark(doc);
+  
+  // Header background
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, pageWidth, 45, "F");
+  
+  // Gold accent stripe
+  doc.setFillColor(...goldColor);
+  doc.rect(0, 45, pageWidth, 3, "F");
+  
+  // Decorative circles in header
+  doc.setFillColor(255, 255, 255);
+  doc.circle(pageWidth - 20, 12, 25, 'F');
+  doc.circle(pageWidth - 45, -5, 18, 'F');
+  doc.circle(25, 38, 12, 'F');
+  
+  // Circular logo with gold ring
+  if (logoImg) {
+    const logoSize = 32;
+    const logoX = 12;
+    const logoY = 7;
+    
+    doc.setDrawColor(...goldColor);
+    doc.setLineWidth(2);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 2);
+    
+    doc.setFillColor(255, 255, 255);
+    doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 0.5, 'F');
+    
+    doc.addImage(logoImg, "PNG", logoX, logoY, logoSize, logoSize);
+  }
 
-  // Student photo box
+  // School name
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(17);
+  doc.setFont("helvetica", "bold");
+  doc.text(schoolName, pageWidth / 2 + 12, 16, { align: "center" });
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(schoolAddress, pageWidth / 2 + 12, 25, { align: "center" });
+
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.text("MONTHLY ATTENDANCE REPORT", pageWidth / 2 + 12, 36, { align: "center" });
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Month: ${format(data.month, "MMMM yyyy")}`, pageWidth / 2 + 12, 43, { align: "center" });
+
+  // Student photo box with gold border
   const photoX = pageWidth - 50;
   const photoY = 55;
   const photoWidth = 30;
   const photoHeight = 38;
+  
+  doc.setDrawColor(...goldColor);
+  doc.setLineWidth(1.5);
+  doc.roundedRect(photoX - 2, photoY - 2, photoWidth + 4, photoHeight + 4, 3, 3, "S");
   
   doc.setDrawColor(...grayColor);
   doc.setLineWidth(0.5);
@@ -352,7 +360,7 @@ export const generateIndividualMonthlyAttendancePdf = async (data: IndividualAtt
   const leftMargin = 15;
   
   doc.setFillColor(...lightGray);
-  doc.roundedRect(leftMargin - 3, yPos - 5, pageWidth - photoWidth - 45, 45, 3, 3, "F");
+  doc.roundedRect(leftMargin - 3, yPos - 5, pageWidth - photoWidth - 48, 45, 3, 3, "F");
   
   doc.setTextColor(...darkColor);
   doc.setFontSize(10);
@@ -413,7 +421,7 @@ export const generateIndividualMonthlyAttendancePdf = async (data: IndividualAtt
     const x = leftMargin + index * (cardWidth + cardGap);
     
     doc.setFillColor(...stat.color);
-    doc.roundedRect(x, yPos, cardWidth, cardHeight, 2, 2, "F");
+    doc.roundedRect(x, yPos, cardWidth, cardHeight, 3, 3, "F");
     
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
@@ -429,11 +437,12 @@ export const generateIndividualMonthlyAttendancePdf = async (data: IndividualAtt
   const circleX = leftMargin + 4 * (cardWidth + cardGap) + 20;
   const circleRadius = 14;
   
-  doc.setDrawColor(...(percentage >= 90 ? [34, 139, 34] : percentage >= 75 ? [255, 165, 0] : [220, 53, 69]) as [number, number, number]);
+  const percColor = percentage >= 90 ? [34, 139, 34] : percentage >= 75 ? [255, 165, 0] : [220, 53, 69];
+  doc.setDrawColor(...(percColor as [number, number, number]));
   doc.setLineWidth(2);
   doc.circle(circleX, yPos + cardHeight / 2, circleRadius);
   
-  doc.setTextColor(...(percentage >= 90 ? [34, 139, 34] : percentage >= 75 ? [255, 165, 0] : [220, 53, 69]) as [number, number, number]);
+  doc.setTextColor(...(percColor as [number, number, number]));
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
   doc.text(`${percentage}%`, circleX, yPos + cardHeight / 2 + 2, { align: "center" });
@@ -441,22 +450,19 @@ export const generateIndividualMonthlyAttendancePdf = async (data: IndividualAtt
   doc.setFontSize(7);
   doc.text("Attendance", circleX, yPos + cardHeight / 2 + 10, { align: "center" });
 
-  // Daily attendance calendar view
+  // Daily attendance calendar
   yPos += cardHeight + 15;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...primaryColor);
   doc.text("DAILY ATTENDANCE RECORD", leftMargin, yPos);
 
-  // Create calendar-style table
   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const firstDayOfMonth = monthStart.getDay();
   
-  // Build calendar rows
   const calendarRows: string[][] = [];
   let currentRow: string[] = [];
   
-  // Add empty cells for days before the first of month
   for (let i = 0; i < firstDayOfMonth; i++) {
     currentRow.push("");
   }
@@ -474,7 +480,6 @@ export const generateIndividualMonthlyAttendancePdf = async (data: IndividualAtt
     }
   });
   
-  // Add remaining days
   if (currentRow.length > 0) {
     while (currentRow.length < 7) {
       currentRow.push("");
@@ -498,21 +503,24 @@ export const generateIndividualMonthlyAttendancePdf = async (data: IndividualAtt
       textColor: darkColor,
       halign: "center",
       valign: "middle",
-      minCellHeight: 15,
+      minCellHeight: 12,
     },
     columnStyles: {
-      0: { cellWidth: 25 },
-      1: { cellWidth: 25 },
-      2: { cellWidth: 25 },
-      3: { cellWidth: 25 },
-      4: { cellWidth: 25 },
-      5: { cellWidth: 25 },
-      6: { cellWidth: 25 },
+      0: { cellWidth: 24 },
+      1: { cellWidth: 24 },
+      2: { cellWidth: 24 },
+      3: { cellWidth: 24 },
+      4: { cellWidth: 24 },
+      5: { cellWidth: 24 },
+      6: { cellWidth: 24 },
     },
     margin: { left: leftMargin, right: leftMargin },
+    alternateRowStyles: {
+      fillColor: [250, 250, 252],
+    },
     didParseCell: (hookData) => {
       if (hookData.section === "body") {
-        const cellText = hookData.cell.text.join("\n");
+        const cellText = hookData.cell.text.join("");
         if (cellText.includes("P")) hookData.cell.styles.textColor = [34, 139, 34];
         else if (cellText.includes("A")) hookData.cell.styles.textColor = [220, 53, 69];
         else if (cellText.includes("L")) hookData.cell.styles.textColor = [255, 165, 0];
@@ -521,15 +529,15 @@ export const generateIndividualMonthlyAttendancePdf = async (data: IndividualAtt
     },
   });
 
-  drawFooter(doc, 1, 1);
+  // Apply styled footer
+  drawStyledFooter(doc, 1, 1, schoolAddress);
 
   return doc;
 };
 
 export const downloadClassMonthlyAttendancePdf = async (data: ClassAttendanceData) => {
   const doc = await generateClassMonthlyAttendancePdf(data);
-  const className = `${data.className}${data.section ? `-${data.section}` : ""}`;
-  doc.save(`Attendance-${className}-${format(data.month, "MMMM-yyyy")}.pdf`);
+  doc.save(`Attendance-${data.className.replace(/\s+/g, "-")}-${format(data.month, "MMMM-yyyy")}.pdf`);
 };
 
 export const downloadIndividualMonthlyAttendancePdf = async (data: IndividualAttendanceData) => {
