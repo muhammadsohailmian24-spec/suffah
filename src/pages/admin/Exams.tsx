@@ -2,91 +2,18 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Plus, Edit, Trash2, Download, FileText, FileUser, MoreHorizontal, ClipboardList, Eye } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import AdminLayout from "@/components/admin/AdminLayout";
+import ExamWizard from "@/components/admin/ExamWizard";
+import ExamsList from "@/components/admin/ExamsList";
+import DocumentPreviewDialog from "@/components/DocumentPreviewDialog";
 import { format, parseISO } from "date-fns";
 import { generateAwardListPdf, downloadAwardList, AwardListData } from "@/utils/generateAwardListPdf";
 import { generateClassRollNumberSlips, downloadClassRollNumberSlips, RollNumberSlipData } from "@/utils/generateRollNumberSlipPdf";
-import SingleRollNumberSlipDialog from "@/components/admin/SingleRollNumberSlipDialog";
-import DocumentPreviewDialog from "@/components/DocumentPreviewDialog";
-
-interface ExamActionsDropdownProps {
-  exam: Exam;
-  onEdit: () => void;
-  onDelete: () => void;
-  onPreviewRollSlips: () => void;
-  onDownloadRollSlips: () => void;
-  onPreviewAwardList: () => void;
-  onDownloadAwardList: () => void;
-  onEnterResults: () => void;
-}
-
-const ExamActionsDropdown = ({ exam, onEdit, onDelete, onPreviewRollSlips, onDownloadRollSlips, onPreviewAwardList, onDownloadAwardList, onEnterResults }: ExamActionsDropdownProps) => {
-  const [singleSlipOpen, setSingleSlipOpen] = useState(false);
-  
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52 bg-popover">
-          <DropdownMenuItem onClick={() => setSingleSlipOpen(true)}>
-            <FileUser className="mr-2 h-4 w-4" />
-            Single Roll Slip
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onPreviewRollSlips}>
-            <Eye className="mr-2 h-4 w-4" />
-            Preview All Roll Slips
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onDownloadRollSlips}>
-            <FileText className="mr-2 h-4 w-4" />
-            Download All Roll Slips
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onPreviewAwardList}>
-            <Eye className="mr-2 h-4 w-4" />
-            Preview Award List
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onDownloadAwardList}>
-            <Download className="mr-2 h-4 w-4" />
-            Download Award List
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onEnterResults}>
-            <ClipboardList className="mr-2 h-4 w-4" />
-            Enter Results
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onEdit}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Exam
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onDelete} className="text-destructive">
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete Exam
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <SingleRollNumberSlipDialog 
-        examName={exam.name} 
-        examType={exam.exam_type}
-        open={singleSlipOpen}
-        onOpenChange={setSingleSlipOpen}
-      />
-    </>
-  );
-};
 
 interface Exam {
   id: string;
@@ -99,6 +26,7 @@ interface Exam {
   end_time: string | null;
   class_id: string;
   subject_id: string;
+  academic_year_id: string | null;
   classes: { name: string } | null;
   subjects: { name: string } | null;
 }
@@ -113,13 +41,37 @@ interface Subject {
   name: string;
 }
 
+interface AcademicYear {
+  id: string;
+  name: string;
+  is_current: boolean;
+}
+
+const EXAM_TYPE_LABELS: Record<string, string> = {
+  midterm: "Mid-Term",
+  final: "Final Term",
+  quiz: "Class Test / Quiz",
+  assignment: "Assignment",
+  practical: "Practical",
+};
+
 const AdminExams = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [exams, setExams] = useState<Exam[]>([]);
+  
+  // Data states
   const [classes, setClasses] = useState<Class[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Wizard selection states
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedExamType, setSelectedExamType] = useState<string | null>(null);
+  
+  // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExam, setEditingExam] = useState<Exam | null>(null);
   
@@ -138,40 +90,64 @@ const AdminExams = () => {
     passing_marks: "40",
     start_time: "",
     end_time: "",
-    class_id: "",
     subject_id: "",
   });
 
   useEffect(() => {
-    fetchData();
+    fetchInitialData();
   }, []);
 
-  const fetchData = async () => {
-    const [examsRes, classesRes, subjectsRes] = await Promise.all([
-      supabase.from("exams").select(`*, classes(name), subjects(name)`).order("exam_date", { ascending: false }),
+  useEffect(() => {
+    if (selectedClassId && selectedSessionId && selectedExamType) {
+      fetchFilteredExams();
+    }
+  }, [selectedClassId, selectedSessionId, selectedExamType]);
+
+  const fetchInitialData = async () => {
+    const [classesRes, subjectsRes, yearsRes] = await Promise.all([
       supabase.from("classes").select("id, name").order("name"),
       supabase.from("subjects").select("id, name").order("name"),
+      supabase.from("academic_years").select("id, name, is_current").order("start_date", { ascending: false }),
     ]);
 
-    setExams((examsRes.data as Exam[]) || []);
     setClasses(classesRes.data || []);
     setSubjects(subjectsRes.data || []);
+    setAcademicYears(yearsRes.data || []);
     setLoading(false);
+  };
+
+  const fetchFilteredExams = async () => {
+    if (!selectedClassId || !selectedSessionId || !selectedExamType) return;
+    
+    const { data } = await supabase
+      .from("exams")
+      .select(`*, classes(name), subjects(name)`)
+      .eq("class_id", selectedClassId)
+      .eq("academic_year_id", selectedSessionId)
+      .eq("exam_type", selectedExamType)
+      .order("exam_date", { ascending: false });
+
+    setExams((data as Exam[]) || []);
   };
 
   const resetForm = () => {
     setFormData({
       name: "",
-      exam_type: "midterm",
+      exam_type: selectedExamType || "midterm",
       exam_date: "",
       max_marks: "100",
       passing_marks: "40",
       start_time: "",
       end_time: "",
-      class_id: "",
       subject_id: "",
     });
     setEditingExam(null);
+  };
+
+  const handleAddExam = () => {
+    resetForm();
+    setFormData(prev => ({ ...prev, exam_type: selectedExamType || "midterm" }));
+    setDialogOpen(true);
   };
 
   const openEditDialog = (exam: Exam) => {
@@ -184,7 +160,6 @@ const AdminExams = () => {
       passing_marks: String(exam.passing_marks || 40),
       start_time: exam.start_time || "",
       end_time: exam.end_time || "",
-      class_id: exam.class_id,
       subject_id: exam.subject_id,
     });
     setDialogOpen(true);
@@ -201,8 +176,9 @@ const AdminExams = () => {
       passing_marks: parseInt(formData.passing_marks),
       start_time: formData.start_time || null,
       end_time: formData.end_time || null,
-      class_id: formData.class_id,
+      class_id: selectedClassId!,
       subject_id: formData.subject_id,
+      academic_year_id: selectedSessionId,
     };
 
     if (editingExam) {
@@ -223,7 +199,7 @@ const AdminExams = () => {
 
     setDialogOpen(false);
     resetForm();
-    fetchData();
+    fetchFilteredExams();
   };
 
   const handleDelete = async (id: string) => {
@@ -235,231 +211,17 @@ const AdminExams = () => {
       return;
     }
     toast({ title: "Success", description: "Exam deleted successfully" });
-    fetchData();
+    fetchFilteredExams();
   };
 
-  const handleDownloadAwardList = async (exam: Exam) => {
-    // Fetch students for this class with proper join
-    const { data: studentsData, error: studentsError } = await supabase
-      .from("students")
-      .select("id, student_id, user_id, class_id, father_name")
-      .eq("class_id", exam.class_id)
-      .eq("status", "active")
-      .order("student_id");
-
-    if (studentsError) {
-      console.error("Error fetching students:", studentsError);
-      toast({ title: "Error", description: "Failed to fetch students", variant: "destructive" });
-      return;
-    }
-
-    if (!studentsData || studentsData.length === 0) {
-      toast({ title: "No students", description: "No students found in this class", variant: "destructive" });
-      return;
-    }
-
-    // Fetch profiles separately
-    const userIds = studentsData.map(s => s.user_id);
-    const { data: profilesData } = await supabase
-      .from("profiles")
-      .select("user_id, full_name")
-      .in("user_id", userIds);
-
-    const profileMap = new Map(profilesData?.map(p => [p.user_id, p.full_name]) || []);
-
-    // Fetch class info
-    const { data: classData } = await supabase
-      .from("classes")
-      .select("name, section")
-      .eq("id", exam.class_id)
-      .single();
-
-    // Fetch results for this exam (including created_at for the date)
-    const studentIds = studentsData.map(s => s.id);
-    const { data: resultsData } = await supabase
-      .from("results")
-      .select("student_id, marks_obtained, created_at")
-      .eq("exam_id", exam.id)
-      .in("student_id", studentIds);
-
-    const resultsMap = new Map(resultsData?.map(r => [r.student_id, r.marks_obtained]) || []);
-
-    // Get the most recent result upload date
-    let resultUploadDate = "";
-    if (resultsData && resultsData.length > 0) {
-      const latestResult = resultsData.reduce((latest, current) => {
-        const latestDate = new Date(latest.created_at || 0);
-        const currentDate = new Date(current.created_at || 0);
-        return currentDate > latestDate ? current : latest;
-      });
-      if (latestResult.created_at) {
-        resultUploadDate = format(parseISO(latestResult.created_at), "dd-MMM-yyyy");
-      }
-    }
-
-    // Fetch teacher name from timetable if available
-    let teacherName = "";
-    const { data: timetableData } = await supabase
-      .from("timetable")
-      .select("teacher_id")
-      .eq("class_id", exam.class_id)
-      .eq("subject_id", exam.subject_id)
-      .limit(1)
-      .maybeSingle();
-
-    if (timetableData?.teacher_id) {
-      const { data: teacherData } = await supabase
-        .from("teachers")
-        .select("user_id")
-        .eq("id", timetableData.teacher_id)
-        .single();
-
-      if (teacherData?.user_id) {
-        const { data: teacherProfile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("user_id", teacherData.user_id)
-          .single();
-
-        teacherName = teacherProfile?.full_name || "";
-      }
-    }
-
-    const students = studentsData.map((student, index) => ({
-      sr_no: index + 1,
-      student_id: student.student_id,
-      name: profileMap.get(student.user_id) || "",
-      father_name: student.father_name || "",
-      theory_marks: resultsMap.get(student.id) || "",
-      practical_marks: "",
-      total_marks: resultsMap.get(student.id) || "",
-    }));
-
-    const currentYear = new Date().getFullYear();
-
-    await downloadAwardList({
-      session: `${currentYear}`,
-      date: resultUploadDate || format(parseISO(exam.exam_date), "dd-MMM-yyyy"),
-      className: classData?.name || exam.classes?.name || "",
-      section: classData?.section || "",
-      subject: exam.subjects?.name || "",
-      teacherName,
-      maxMarks: String(exam.max_marks || "100"),
-      students,
-    }, `Award-List-${exam.classes?.name}-${exam.subjects?.name}`);
-
-    toast({ title: "Downloaded", description: "Award list PDF downloaded successfully" });
+  const handleReset = () => {
+    setSelectedClassId(null);
+    setSelectedSessionId(null);
+    setSelectedExamType(null);
+    setExams([]);
   };
 
-  const handleDownloadRollNumberSlips = async (exam: Exam) => {
-    // Fetch students for this class
-    const { data: studentsData, error: studentsError } = await supabase
-      .from("students")
-      .select("id, student_id, user_id, class_id")
-      .eq("class_id", exam.class_id)
-      .eq("status", "active");
-
-    if (studentsError) {
-      console.error("Error fetching students:", studentsError);
-      toast({ title: "Error", description: "Failed to fetch students", variant: "destructive" });
-      return;
-    }
-
-    if (!studentsData || studentsData.length === 0) {
-      toast({ title: "No students", description: "No students found in this class", variant: "destructive" });
-      return;
-    }
-
-    // Fetch profiles
-    const userIds = studentsData.map(s => s.user_id);
-    const { data: profilesData } = await supabase
-      .from("profiles")
-      .select("user_id, full_name, photo_url")
-      .in("user_id", userIds);
-
-    const profileMap = new Map(profilesData?.map(p => [p.user_id, { name: p.full_name, photo: p.photo_url }]) || []);
-
-    // Fetch class info
-    const { data: classData } = await supabase
-      .from("classes")
-      .select("name, section")
-      .eq("id", exam.class_id)
-      .single();
-
-    // Fetch father's name from parent records
-    const studentIds = studentsData.map(s => s.id);
-    const { data: parentLinks } = await supabase
-      .from("student_parents")
-      .select("student_id, parent_id")
-      .in("student_id", studentIds)
-      .eq("is_primary", true);
-
-    const fatherNameMap = new Map<string, string>();
-    if (parentLinks && parentLinks.length > 0) {
-      const parentIds = parentLinks.map(p => p.parent_id);
-      const { data: parents } = await supabase
-        .from("parents")
-        .select("id, user_id")
-        .in("id", parentIds);
-
-      if (parents) {
-        const parentUserIds = parents.map(p => p.user_id);
-        const { data: parentProfiles } = await supabase
-          .from("profiles")
-          .select("user_id, full_name")
-          .in("user_id", parentUserIds);
-
-        const parentProfileMap = new Map(parentProfiles?.map(p => [p.user_id, p.full_name]) || []);
-        const parentIdToName = new Map(parents.map(p => [p.id, parentProfileMap.get(p.user_id) || ""]));
-
-        parentLinks.forEach(link => {
-          fatherNameMap.set(link.student_id, parentIdToName.get(link.parent_id) || "");
-        });
-      }
-    }
-
-    // Fetch all exams for this class to create subject schedule
-    const { data: classExams } = await supabase
-      .from("exams")
-      .select("*, subjects(name)")
-      .eq("class_id", exam.class_id)
-      .gte("exam_date", exam.exam_date)
-      .order("exam_date");
-
-    const subjects = classExams?.map(e => ({
-      name: e.subjects?.name || "",
-      date: format(parseISO(e.exam_date), "dd-MMM-yyyy"),
-      time: e.start_time ? `${e.start_time}${e.end_time ? ` - ${e.end_time}` : ""}` : undefined,
-    })) || [];
-
-    // Sort students alphabetically by name and assign roll numbers
-    const sortedStudents = studentsData
-      .map(student => ({
-        ...student,
-        name: profileMap.get(student.user_id)?.name || "",
-        photo: profileMap.get(student.user_id)?.photo || undefined,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    const rollNumberSlipData = sortedStudents.map((student, index) => ({
-      studentName: student.name,
-      studentId: student.student_id,
-      fatherName: fatherNameMap.get(student.id),
-      className: classData?.name || exam.classes?.name || "",
-      section: classData?.section,
-      rollNumber: String(index + 1), // Auto-assign roll number based on alphabetical order
-      examName: exam.name,
-      examDate: format(parseISO(exam.exam_date), "dd-MMM-yyyy"),
-      examTime: exam.start_time ? `${exam.start_time}${exam.end_time ? ` - ${exam.end_time}` : ""}` : undefined,
-      subjects,
-      photoUrl: student.photo,
-    }));
-
-    await downloadClassRollNumberSlips(rollNumberSlipData, classData?.name || exam.classes?.name || "Class");
-    toast({ title: "Downloaded", description: "Roll number slips PDF downloaded successfully" });
-  };
-
-  // Preview handlers
+  // PDF Generation functions (same as before)
   const prepareAwardListData = async (exam: Exam): Promise<AwardListData | null> => {
     const { data: studentsData, error: studentsError } = await supabase
       .from("students")
@@ -499,8 +261,10 @@ const AdminExams = () => {
       }
     }
 
+    const sessionName = academicYears.find(a => a.id === selectedSessionId)?.name || "";
+
     return {
-      session: `${new Date().getFullYear()}`,
+      session: sessionName,
       date: resultUploadDate || format(parseISO(exam.exam_date), "dd-MMM-yyyy"),
       className: classData?.name || exam.classes?.name || "",
       section: classData?.section || "",
@@ -577,6 +341,14 @@ const AdminExams = () => {
     }
   };
 
+  const handleDownloadAwardList = async (exam: Exam) => {
+    const data = await prepareAwardListData(exam);
+    if (data) {
+      await downloadAwardList(data, `Award-List-${exam.classes?.name}-${exam.subjects?.name}`);
+      toast({ title: "Downloaded", description: "Award list PDF downloaded successfully" });
+    }
+  };
+
   const handlePreviewRollSlips = async (exam: Exam) => {
     const data = await prepareRollSlipsData(exam);
     if (data) {
@@ -587,15 +359,17 @@ const AdminExams = () => {
     }
   };
 
-  const getExamTypeBadge = (type: string) => {
-    const variants: Record<string, "default" | "secondary" | "outline"> = {
-      midterm: "default",
-      final: "secondary",
-      quiz: "outline",
-      assignment: "outline",
-    };
-    return <Badge variant={variants[type] || "outline"}>{type}</Badge>;
+  const handleDownloadRollSlips = async (exam: Exam) => {
+    const data = await prepareRollSlipsData(exam);
+    if (data) {
+      await downloadClassRollNumberSlips(data, exam.classes?.name || "Class");
+      toast({ title: "Downloaded", description: "Roll number slips PDF downloaded successfully" });
+    }
   };
+
+  const selectedClassName = classes.find(c => c.id === selectedClassId)?.name || "";
+  const selectedSessionName = academicYears.find(a => a.id === selectedSessionId)?.name || "";
+  const showExamsList = selectedClassId && selectedSessionId && selectedExamType;
 
   if (loading) {
     return (
@@ -608,135 +382,93 @@ const AdminExams = () => {
   }
 
   return (
-    <AdminLayout title="Exam Management" description="Schedule and manage exams">
-      <div className="flex justify-end mb-6">
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Add Exam</Button>
-          </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>{editingExam ? "Edit Exam" : "Create New Exam"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <Label>Exam Name</Label>
-                    <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-                  </div>
-                  <div>
-                    <Label>Exam Type</Label>
-                    <Select value={formData.exam_type} onValueChange={(v) => setFormData({ ...formData, exam_type: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="midterm">Midterm</SelectItem>
-                        <SelectItem value="final">Final</SelectItem>
-                        <SelectItem value="quiz">Quiz</SelectItem>
-                        <SelectItem value="assignment">Assignment</SelectItem>
-                        <SelectItem value="practical">Practical</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Exam Date</Label>
-                    <Input type="date" value={formData.exam_date} onChange={(e) => setFormData({ ...formData, exam_date: e.target.value })} required />
-                  </div>
-                  <div>
-                    <Label>Class</Label>
-                    <Select value={formData.class_id} onValueChange={(v) => setFormData({ ...formData, class_id: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
-                      <SelectContent>
-                        {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Subject</Label>
-                    <Select value={formData.subject_id} onValueChange={(v) => setFormData({ ...formData, subject_id: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
-                      <SelectContent>
-                        {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Max Marks</Label>
-                    <Input type="number" value={formData.max_marks} onChange={(e) => setFormData({ ...formData, max_marks: e.target.value })} required />
-                  </div>
-                  <div>
-                    <Label>Passing Marks</Label>
-                    <Input type="number" value={formData.passing_marks} onChange={(e) => setFormData({ ...formData, passing_marks: e.target.value })} required />
-                  </div>
-                  <div>
-                    <Label>Start Time</Label>
-                    <Input type="time" value={formData.start_time} onChange={(e) => setFormData({ ...formData, start_time: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>End Time</Label>
-                    <Input type="time" value={formData.end_time} onChange={(e) => setFormData({ ...formData, end_time: e.target.value })} />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                  <Button type="submit">{editingExam ? "Update" : "Create"}</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-      </div>
+    <AdminLayout 
+      title="Exam Management" 
+      description={showExamsList 
+        ? `${selectedClassName} • ${selectedSessionName} • ${EXAM_TYPE_LABELS[selectedExamType] || selectedExamType}` 
+        : "Select class, session, and exam type to view exams"
+      }
+    >
+      {!showExamsList ? (
+        <ExamWizard
+          classes={classes}
+          academicYears={academicYears}
+          selectedClassId={selectedClassId}
+          selectedSessionId={selectedSessionId}
+          selectedExamType={selectedExamType}
+          onClassSelect={setSelectedClassId}
+          onSessionSelect={setSelectedSessionId}
+          onExamTypeSelect={setSelectedExamType}
+          onReset={handleReset}
+        />
+      ) : (
+        <ExamsList
+          exams={exams}
+          className={selectedClassName}
+          sessionName={selectedSessionName}
+          examType={selectedExamType}
+          onBack={handleReset}
+          onAddExam={handleAddExam}
+          onEditExam={openEditDialog}
+          onDeleteExam={handleDelete}
+          onPreviewRollSlips={handlePreviewRollSlips}
+          onDownloadRollSlips={handleDownloadRollSlips}
+          onPreviewAwardList={handlePreviewAwardList}
+          onDownloadAwardList={handleDownloadAwardList}
+        />
+      )}
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Exam Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead>Subject</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead>Marks</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {exams.map(exam => (
-                <TableRow key={exam.id}>
-                  <TableCell className="font-medium">{exam.name}</TableCell>
-                  <TableCell>{getExamTypeBadge(exam.exam_type)}</TableCell>
-                  <TableCell>{exam.classes?.name}</TableCell>
-                  <TableCell>{exam.subjects?.name}</TableCell>
-                  <TableCell>{format(parseISO(exam.exam_date), "MMM d, yyyy")}</TableCell>
-                  <TableCell>{exam.start_time && exam.end_time ? `${exam.start_time} - ${exam.end_time}` : "-"}</TableCell>
-                  <TableCell>{exam.max_marks} (Pass: {exam.passing_marks})</TableCell>
-                  <TableCell className="text-right">
-                    <ExamActionsDropdown 
-                      exam={exam}
-                      onEdit={() => openEditDialog(exam)}
-                      onDelete={() => handleDelete(exam.id)}
-                      onPreviewRollSlips={() => handlePreviewRollSlips(exam)}
-                      onDownloadRollSlips={() => handleDownloadRollNumberSlips(exam)}
-                      onPreviewAwardList={() => handlePreviewAwardList(exam)}
-                      onDownloadAwardList={() => handleDownloadAwardList(exam)}
-                      onEnterResults={() => navigate("/admin/results")}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-              {exams.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    No exams scheduled. Click "Add Exam" to create one.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-      
-      {/* Document Preview Dialog */}
+      {/* Add/Edit Exam Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingExam ? "Edit Exam" : "Create New Exam"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Label>Exam Name</Label>
+                <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+              </div>
+              <div>
+                <Label>Subject</Label>
+                <Select value={formData.subject_id} onValueChange={(v) => setFormData({ ...formData, subject_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
+                  <SelectContent>
+                    {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Exam Date</Label>
+                <Input type="date" value={formData.exam_date} onChange={(e) => setFormData({ ...formData, exam_date: e.target.value })} required />
+              </div>
+              <div>
+                <Label>Max Marks</Label>
+                <Input type="number" value={formData.max_marks} onChange={(e) => setFormData({ ...formData, max_marks: e.target.value })} required />
+              </div>
+              <div>
+                <Label>Passing Marks</Label>
+                <Input type="number" value={formData.passing_marks} onChange={(e) => setFormData({ ...formData, passing_marks: e.target.value })} required />
+              </div>
+              <div>
+                <Label>Start Time</Label>
+                <Input type="time" value={formData.start_time} onChange={(e) => setFormData({ ...formData, start_time: e.target.value })} />
+              </div>
+              <div>
+                <Label>End Time</Label>
+                <Input type="time" value={formData.end_time} onChange={(e) => setFormData({ ...formData, end_time: e.target.value })} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+              <Button type="submit">{editingExam ? "Update" : "Create"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Document Preview Dialogs */}
       {previewType === "awardList" && previewAwardListData && (
         <DocumentPreviewDialog
           open={previewOpen}
